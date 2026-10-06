@@ -15,6 +15,12 @@ enum CoupleRole {
   MEMBER
 }
 
+enum SavingsGoalStatus {
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
 // ============================================
 // USUARIO (Auth.js + NEXO)
 // ============================================
@@ -118,22 +124,27 @@ model SavingsContribution {
 }
 
 // ============================================
-// METAS (infraestructura mínima - UI en Fase 5)
+// METAS
 // ============================================
 
 model SavingsGoal {
-  id           String   @id @default(cuid())
+  id           String             @id @default(cuid())
   coupleId     String
-  name         String
-  targetAmount Decimal  @db.Decimal(14, 2)
-  status       String   @default("ACTIVE")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  name         String             @db.VarChar(120)
+  description  String?            @db.VarChar(500)
+  targetAmount Decimal            @db.Decimal(14, 2)
+  targetDate   DateTime?
+  status       SavingsGoalStatus  @default(ACTIVE)
+  completedAt  DateTime?
+  archivedAt   DateTime?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
 
   couple        Couple                @relation(fields: [coupleId], references: [id], onDelete: Cascade)
   contributions SavingsContribution[]
 
-  @@index([coupleId])
+  @@index([coupleId, status])
+  @@index([coupleId, createdAt])
 }
 
 // ============================================

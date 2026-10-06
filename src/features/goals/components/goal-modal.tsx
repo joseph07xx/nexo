@@ -1,39 +1,33 @@
 "use client";
 
 import { X } from "lucide-react";
-import {
-  ContributionForm,
-  type ContributionFormValues,
-  type GoalOption,
-} from "./contribution-form";
-import type { ContributionActionResult } from "../actions";
+import { GoalForm, type GoalFormValues } from "./goal-form";
+import type { GoalActionResult } from "../actions";
 
-interface ContributionModalProps {
+interface GoalModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
   title: string;
   action: (
-    prevState: ContributionActionResult | null,
+    prevState: GoalActionResult | null,
     formData: FormData
-  ) => Promise<ContributionActionResult>;
-  initialValues?: Partial<ContributionFormValues>;
-  goalOptions?: GoalOption[];
+  ) => Promise<GoalActionResult>;
+  initialValues?: Partial<GoalFormValues>;
   submitLabel?: string;
   pendingLabel?: string;
 }
 
-export function ContributionModal({
+export function GoalModal({
   open,
   onClose,
   onSuccess,
   title,
   action,
   initialValues,
-  goalOptions,
   submitLabel,
   pendingLabel,
-}: ContributionModalProps) {
+}: GoalModalProps) {
   if (!open) return null;
 
   return (
@@ -56,10 +50,9 @@ export function ContributionModal({
           </button>
         </div>
 
-        <ContributionForm
+        <GoalForm
           action={action}
           initialValues={initialValues}
-          goalOptions={goalOptions}
           onSuccess={onSuccess}
           onCancel={onClose}
           submitLabel={submitLabel}

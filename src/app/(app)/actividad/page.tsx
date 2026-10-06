@@ -7,6 +7,7 @@ import { listContributions } from "@/features/contributions/data";
 import { ContributionList } from "@/features/contributions/components/contribution-list";
 import { CreateContributionButton } from "@/features/contributions/components/create-contribution-button";
 import { serializeContribution } from "@/features/contributions/types";
+import { getActiveGoalsForSelect } from "@/features/goals/data";
 
 interface ActividadPageProps {
   searchParams: Promise<{ page?: string }>;
@@ -47,10 +48,13 @@ export default async function ActividadPage({ searchParams }: ActividadPageProps
   const params = await searchParams;
   const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
 
-  const result = await listContributions({
-    coupleId,
-    page,
-  });
+  const [result, goalOptions] = await Promise.all([
+    listContributions({
+      coupleId,
+      page,
+    }),
+    getActiveGoalsForSelect(coupleId),
+  ]);
 
   const serializedItems = result.items.map(serializeContribution);
 
@@ -63,7 +67,11 @@ export default async function ActividadPage({ searchParams }: ActividadPageProps
             Historial de movimientos de su pareja
           </p>
         </div>
-        <CreateContributionButton size="default" label="Registrar" />
+        <CreateContributionButton
+          size="default"
+          label="Registrar"
+          goalOptions={goalOptions}
+        />
       </header>
 
       <ContributionList

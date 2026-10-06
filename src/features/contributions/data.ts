@@ -1,5 +1,7 @@
-import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+
+import { prisma } from "@/lib/prisma";
+import { reconcileGoalStatus } from "@/features/goals/data";
 
 // ============================================
 // CONSULTAS
@@ -30,8 +32,14 @@ export async function listContributions({
 
   if (fromDate || toDate) {
     where.contributionDate = {};
-    if (fromDate) where.contributionDate.gte = fromDate;
-    if (toDate) where.contributionDate.lte = toDate;
+
+    if (fromDate) {
+      where.contributionDate.gte = fromDate;
+    }
+
+    if (toDate) {
+      where.contributionDate.lte = toDate;
+    }
   }
 
   const skip = (page - 1) * CONTRIBUTION_PAGE_SIZE;
@@ -41,7 +49,18 @@ export async function listContributions({
       where,
       include: {
         user: {
-          select: { id: true, name: true, email: true },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        goal: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+          },
         },
       },
       orderBy: [
@@ -51,7 +70,10 @@ export async function listContributions({
       skip,
       take: CONTRIBUTION_PAGE_SIZE,
     }),
-    prisma.savingsContribution.count({ where }),
+
+    prisma.savingsContribution.count({
+      where,
+    }),
   ]);
 
   return {
@@ -64,7 +86,9 @@ export async function listContributions({
 }
 
 export async function countContributionsByCouple(coupleId: string) {
-  return prisma.savingsContribution.count({ where: { coupleId } });
+  return prisma.savingsContribution.count({
+    where: { coupleId },
+  });
 }
 
 export async function getContributionById(id: string) {
@@ -72,7 +96,11 @@ export async function getContributionById(id: string) {
     where: { id },
     include: {
       user: {
-        select: { id: true, name: true, email: true },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
       },
     },
   });
@@ -87,16 +115,31 @@ export async function getAllContributionsByCouple(coupleId: string) {
       amount: true,
       contributionDate: true,
     },
-    orderBy: { contributionDate: "desc" },
+    orderBy: {
+      contributionDate: "desc",
+    },
   });
 }
 
-export async function getRecentContributions(coupleId: string, limit = 5) {
+export async function getRecentContributions(
+  coupleId: string,
+  limit = 5
+) {
   return prisma.savingsContribution.findMany({
     where: { coupleId },
     include: {
       user: {
-        select: { id: true, name: true },
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      goal: {
+        select: {
+          id: true,
+          name: true,
+          status: true,
+        },
       },
     },
     orderBy: [
@@ -120,21 +163,35 @@ export interface CreateContributionData {
   goalId?: string | null;
 }
 
-export async function createContribution(data: CreateContributionData) {
-  return prisma.savingsContribution.create({
-    data: {
-      coupleId: data.coupleId,
-      userId: data.userId,
-      amount: data.amount,
-      contributionDate: data.contributionDate,
-      note: data.note,
-      goalId: data.goalId ?? null,
-    },
-    include: {
-      user: {
-        select: { id: true, name: true, email: true },
+export async function createContribution(
+  data: CreateContributionData
+) {
+  return prisma.$transaction(async (tx) => {
+    const contribution = await tx.savingsContribution.create({
+      data: {
+        coupleId: data.coupleId,
+        userId: data.userId,
+        amount: data.amount,
+        contributionDate: data.contributionDate,
+        note: data.note,
+        goalId: data.goalId ?? null,
       },
-    },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (data.goalId) {
+      await reconcileGoalStatus(tx, data.goalId);
+    }
+
+    return contribution;
   });
 }
 
@@ -146,26 +203,77 @@ export interface UpdateContributionData {
   goalId?: string | null;
 }
 
-export async function updateContribution(data: UpdateContributionData) {
-  return prisma.savingsContribution.update({
-    where: { id: data.id },
-    data: {
-      amount: data.amount,
-      contributionDate: data.contributionDate,
-      note: data.note,
-      goalId: data.goalId ?? null,
-    },
-    include: {
-      user: {
-        select: { id: true, name: true, email: true },
+export async function updateContribution(
+  data: UpdateContributionData
+) {
+  return prisma.$transaction(async (tx) => {
+    const previous = await tx.savingsContribution.findUnique({
+      where: {
+        id: data.id,
       },
-    },
+      select: {
+        goalId: true,
+      },
+    });
+
+    const updated = await tx.savingsContribution.update({
+      where: {
+        id: data.id,
+      },
+      data: {
+        amount: data.amount,
+        contributionDate: data.contributionDate,
+        note: data.note,
+        goalId: data.goalId ?? null,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (
+      previous?.goalId &&
+      previous.goalId !== data.goalId
+    ) {
+      await reconcileGoalStatus(tx, previous.goalId);
+    }
+
+    if (data.goalId) {
+      await reconcileGoalStatus(tx, data.goalId);
+    }
+
+    return updated;
   });
 }
 
 export async function deleteContribution(id: string) {
-  return prisma.savingsContribution.delete({
-    where: { id },
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.savingsContribution.findUnique({
+      where: {
+        id,
+      },
+      select: {
+        goalId: true,
+      },
+    });
+
+    const deleted = await tx.savingsContribution.delete({
+      where: {
+        id,
+      },
+    });
+
+    if (existing?.goalId) {
+      await reconcileGoalStatus(tx, existing.goalId);
+    }
+
+    return deleted;
   });
 }
 
@@ -187,14 +295,36 @@ export async function getDashboardTotals(
   coupleId: string,
   now: Date = new Date()
 ): Promise<DashboardTotals> {
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const startOfMonth = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    1
+  );
 
-  const [allContributions, monthContributions, members] = await Promise.all([
+  const endOfMonth = new Date(
+    now.getFullYear(),
+    now.getMonth() + 1,
+    0,
+    23,
+    59,
+    59,
+    999
+  );
+
+  const [
+    allContributions,
+    monthContributions,
+    members,
+  ] = await Promise.all([
     prisma.savingsContribution.findMany({
-      where: { coupleId },
-      select: { amount: true },
+      where: {
+        coupleId,
+      },
+      select: {
+        amount: true,
+      },
     }),
+
     prisma.savingsContribution.findMany({
       where: {
         coupleId,
@@ -208,30 +338,45 @@ export async function getDashboardTotals(
         userId: true,
       },
     }),
+
     prisma.coupleMember.findMany({
-      where: { coupleId },
+      where: {
+        coupleId,
+      },
       include: {
         user: {
-          select: { id: true, name: true },
+          select: {
+            id: true,
+            name: true,
+          },
         },
       },
     }),
   ]);
 
   const totalAllTime = allContributions.reduce(
-    (acc, c) => acc.plus(c.amount),
+    (acc, contribution) =>
+      acc.plus(contribution.amount),
     new Prisma.Decimal(0)
   );
 
   const totalThisMonth = monthContributions.reduce(
-    (acc, c) => acc.plus(c.amount),
+    (acc, contribution) =>
+      acc.plus(contribution.amount),
     new Prisma.Decimal(0)
   );
 
   const byUserThisMonth = members.map((member) => {
     const userTotal = monthContributions
-      .filter((c) => c.userId === member.userId)
-      .reduce((acc, c) => acc.plus(c.amount), new Prisma.Decimal(0));
+      .filter(
+        (contribution) =>
+          contribution.userId === member.userId
+      )
+      .reduce(
+        (acc, contribution) =>
+          acc.plus(contribution.amount),
+        new Prisma.Decimal(0)
+      );
 
     return {
       userId: member.userId,

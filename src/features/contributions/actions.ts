@@ -1,3 +1,4 @@
+
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -22,7 +23,11 @@ import { serializeContribution } from "./types";
 
 export type ContributionActionResult<T = unknown> =
   | { success: true; data: T }
-  | { success: false; error: string; fieldErrors?: Record<string, string[]> };
+  | {
+      success: false;
+      error: string;
+      fieldErrors?: Record<string, string[]>;
+    };
 
 // ============================================
 // HELPERS
@@ -30,20 +35,29 @@ export type ContributionActionResult<T = unknown> =
 
 async function getAuthenticatedCouple() {
   const session = await auth();
+
   if (!session?.user?.id || !session.user.coupleId) {
     return null;
   }
+
   return {
     userId: session.user.id,
     coupleId: session.user.coupleId,
   };
 }
 
-async function getCoupleCreatedAt(coupleId: string): Promise<Date | null> {
+async function getCoupleCreatedAt(
+  coupleId: string
+): Promise<Date | null> {
   const couple = await prisma.couple.findUnique({
-    where: { id: coupleId },
-    select: { createdAt: true },
+    where: {
+      id: coupleId,
+    },
+    select: {
+      createdAt: true,
+    },
   });
+
   return couple?.createdAt ?? null;
 }
 
@@ -56,8 +70,12 @@ export async function createContributionAction(
   formData: FormData
 ): Promise<ContributionActionResult> {
   const auth = await getAuthenticatedCouple();
+
   if (!auth) {
-    return { success: false, error: "No autenticado o sin pareja" };
+    return {
+      success: false,
+      error: "No autenticado o sin pareja",
+    };
   }
 
   const parsed = createContributionSchema.safeParse({
@@ -75,35 +93,79 @@ export async function createContributionAction(
     };
   }
 
-  const { amount, contributionDate, note, goalId } = parsed.data;
+  const {
+    amount,
+    contributionDate,
+    note,
+    goalId,
+  } = parsed.data;
 
-  const coupleCreatedAt = await getCoupleCreatedAt(auth.coupleId);
+  // ============================================
+  // VALIDAR FECHA
+  // ============================================
+
+  const coupleCreatedAt = await getCoupleCreatedAt(
+    auth.coupleId
+  );
+
   if (!coupleCreatedAt) {
-    return { success: false, error: "Pareja no encontrada" };
+    return {
+      success: false,
+      error: "Pareja no encontrada",
+    };
   }
 
-  const dateCheck = isValidContributionDate(contributionDate, coupleCreatedAt);
+  const dateCheck = isValidContributionDate(
+    contributionDate,
+    coupleCreatedAt
+  );
+
   if (!dateCheck.valid) {
-    const messages: Record<typeof dateCheck.reason, string> = {
+    const messages: Record<
+      typeof dateCheck.reason,
+      string
+    > = {
       FUTURE: "La fecha no puede ser futura",
-      BEFORE_COUPLE: "La fecha no puede ser anterior a la creación de la pareja",
+      BEFORE_COUPLE:
+        "La fecha no puede ser anterior a la creación de la pareja",
     };
+
     return {
       success: false,
       error: "Fecha inválida",
-      fieldErrors: { contributionDate: [messages[dateCheck.reason]] },
+      fieldErrors: {
+        contributionDate: [
+          messages[dateCheck.reason],
+        ],
+      },
     };
   }
 
+  // ============================================
+  // VALIDAR META
+  // ============================================
+
   if (goalId) {
     const goal = await prisma.savingsGoal.findUnique({
-      where: { id: goalId },
-      select: { coupleId: true },
+      where: {
+        id: goalId,
+      },
+      select: {
+        coupleId: true,
+      },
     });
+
     if (!goal || goal.coupleId !== auth.coupleId) {
-      return { success: false, error: "Meta inválida" };
+      return {
+        success: false,
+        error: "Meta inválida",
+      };
     }
   }
+
+  // ============================================
+  // CREAR APORTE
+  // ============================================
 
   try {
     const contribution = await createContribution({
@@ -118,10 +180,17 @@ export async function createContributionAction(
     revalidatePath("/inicio");
     revalidatePath("/actividad");
 
-    return { success: true, data: serializeContribution(contribution) };
+    return {
+      success: true,
+      data: serializeContribution(contribution),
+    };
   } catch (error) {
     console.error("Error al crear aporte:", error);
-    return { success: false, error: "No se pudo registrar el aporte" };
+
+    return {
+      success: false,
+      error: "No se pudo registrar el aporte",
+    };
   }
 }
 
@@ -135,22 +204,52 @@ export async function updateContributionAction(
   formData: FormData
 ): Promise<ContributionActionResult> {
   const auth = await getAuthenticatedCouple();
+
   if (!auth) {
-    return { success: false, error: "No autenticado o sin pareja" };
+    return {
+      success: false,
+      error: "No autenticado o sin pareja",
+    };
   }
+
+  // ============================================
+  // BUSCAR APORTE EXISTENTE
+  // ============================================
 
   const existing = await getContributionById(id);
+
   if (!existing) {
-    return { success: false, error: "Aporte no encontrado" };
+    return {
+      success: false,
+      error: "Aporte no encontrado",
+    };
   }
+
+  // ============================================
+  // VALIDAR PERTENENCIA A LA PAREJA
+  // ============================================
 
   if (existing.coupleId !== auth.coupleId) {
-    return { success: false, error: "Aporte no encontrado" };
+    return {
+      success: false,
+      error: "Aporte no encontrado",
+    };
   }
 
+  // ============================================
+  // VALIDAR PROPIETARIO
+  // ============================================
+
   if (existing.userId !== auth.userId) {
-    return { success: false, error: "Solo puedes editar tus propios aportes" };
+    return {
+      success: false,
+      error: "Solo puedes editar tus propios aportes",
+    };
   }
+
+  // ============================================
+  // VALIDAR DATOS
+  // ============================================
 
   const parsed = updateContributionSchema.safeParse({
     amount: formData.get("amount"),
@@ -167,35 +266,79 @@ export async function updateContributionAction(
     };
   }
 
-  const { amount, contributionDate, note, goalId } = parsed.data;
+  const {
+    amount,
+    contributionDate,
+    note,
+    goalId,
+  } = parsed.data;
 
-  const coupleCreatedAt = await getCoupleCreatedAt(auth.coupleId);
+  // ============================================
+  // VALIDAR FECHA
+  // ============================================
+
+  const coupleCreatedAt = await getCoupleCreatedAt(
+    auth.coupleId
+  );
+
   if (!coupleCreatedAt) {
-    return { success: false, error: "Pareja no encontrada" };
+    return {
+      success: false,
+      error: "Pareja no encontrada",
+    };
   }
 
-  const dateCheck = isValidContributionDate(contributionDate, coupleCreatedAt);
+  const dateCheck = isValidContributionDate(
+    contributionDate,
+    coupleCreatedAt
+  );
+
   if (!dateCheck.valid) {
-    const messages: Record<typeof dateCheck.reason, string> = {
+    const messages: Record<
+      typeof dateCheck.reason,
+      string
+    > = {
       FUTURE: "La fecha no puede ser futura",
-      BEFORE_COUPLE: "La fecha no puede ser anterior a la creación de la pareja",
+      BEFORE_COUPLE:
+        "La fecha no puede ser anterior a la creación de la pareja",
     };
+
     return {
       success: false,
       error: "Fecha inválida",
-      fieldErrors: { contributionDate: [messages[dateCheck.reason]] },
+      fieldErrors: {
+        contributionDate: [
+          messages[dateCheck.reason],
+        ],
+      },
     };
   }
 
+  // ============================================
+  // VALIDAR META
+  // ============================================
+
   if (goalId) {
     const goal = await prisma.savingsGoal.findUnique({
-      where: { id: goalId },
-      select: { coupleId: true },
+      where: {
+        id: goalId,
+      },
+      select: {
+        coupleId: true,
+      },
     });
+
     if (!goal || goal.coupleId !== auth.coupleId) {
-      return { success: false, error: "Meta inválida" };
+      return {
+        success: false,
+        error: "Meta inválida",
+      };
     }
   }
+
+  // ============================================
+  // ACTUALIZAR APORTE
+  // ============================================
 
   try {
     const updated = await updateContribution({
@@ -209,10 +352,20 @@ export async function updateContributionAction(
     revalidatePath("/inicio");
     revalidatePath("/actividad");
 
-    return { success: true, data: serializeContribution(updated) };
+    return {
+      success: true,
+      data: serializeContribution(updated),
+    };
   } catch (error) {
-    console.error("Error al actualizar aporte:", error);
-    return { success: false, error: "No se pudo actualizar el aporte" };
+    console.error(
+      "Error al actualizar aporte:",
+      error
+    );
+
+    return {
+      success: false,
+      error: "No se pudo actualizar el aporte",
+    };
   }
 }
 
@@ -224,22 +377,52 @@ export async function deleteContributionAction(
   id: string
 ): Promise<ContributionActionResult> {
   const auth = await getAuthenticatedCouple();
+
   if (!auth) {
-    return { success: false, error: "No autenticado o sin pareja" };
+    return {
+      success: false,
+      error: "No autenticado o sin pareja",
+    };
   }
+
+  // ============================================
+  // BUSCAR APORTE EXISTENTE
+  // ============================================
 
   const existing = await getContributionById(id);
+
   if (!existing) {
-    return { success: false, error: "Aporte no encontrado" };
+    return {
+      success: false,
+      error: "Aporte no encontrado",
+    };
   }
+
+  // ============================================
+  // VALIDAR PERTENENCIA A LA PAREJA
+  // ============================================
 
   if (existing.coupleId !== auth.coupleId) {
-    return { success: false, error: "Aporte no encontrado" };
+    return {
+      success: false,
+      error: "Aporte no encontrado",
+    };
   }
 
+  // ============================================
+  // VALIDAR PROPIETARIO
+  // ============================================
+
   if (existing.userId !== auth.userId) {
-    return { success: false, error: "Solo puedes eliminar tus propios aportes" };
+    return {
+      success: false,
+      error: "Solo puedes eliminar tus propios aportes",
+    };
   }
+
+  // ============================================
+  // ELIMINAR APORTE
+  // ============================================
 
   try {
     await deleteContribution(id);
@@ -247,9 +430,19 @@ export async function deleteContributionAction(
     revalidatePath("/inicio");
     revalidatePath("/actividad");
 
-    return { success: true, data: undefined };
+    return {
+      success: true,
+      data: undefined,
+    };
   } catch (error) {
-    console.error("Error al eliminar aporte:", error);
-    return { success: false, error: "No se pudo eliminar el aporte" };
+    console.error(
+      "Error al eliminar aporte:",
+      error
+    );
+
+    return {
+      success: false,
+      error: "No se pudo eliminar el aporte",
+    };
   }
 }

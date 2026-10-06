@@ -4,27 +4,22 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
-import { ContributionModal } from "./contribution-modal";
-import { createContributionAction } from "../actions";
-import type { GoalOption } from "./contribution-form";
+import { GoalModal } from "./goal-modal";
+import { createGoalAction } from "../actions";
 
-interface CreateContributionButtonProps {
+interface CreateGoalButtonProps {
   variant?: "default" | "outline";
   size?: "default" | "lg";
   className?: string;
   label?: string;
-  defaultGoalId?: string;
-  goalOptions?: GoalOption[];
 }
 
-export function CreateContributionButton({
+export function CreateGoalButton({
   variant = "default",
   size = "lg",
   className,
-  label = "Registrar aporte",
-  defaultGoalId,
-  goalOptions = [],
-}: CreateContributionButtonProps) {
+  label = "Nueva meta",
+}: CreateGoalButtonProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
@@ -45,14 +40,12 @@ export function CreateContributionButton({
         {label}
       </Button>
 
-      <ContributionModal
+      <GoalModal
         open={open}
         onClose={() => setOpen(false)}
         onSuccess={handleSuccess}
-        title="Registrar aporte"
-        action={createContributionAction}
-        initialValues={defaultGoalId ? { goalId: defaultGoalId } : undefined}
-        goalOptions={goalOptions}
+        title="Nueva meta"
+        action={createGoalAction}
       />
     </>
   );

@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useActionState, useState, useEffect } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,10 +11,17 @@ export interface ContributionFormValues {
   amount: string;
   contributionDate: string;
   note: string;
+  goalId: string;
+}
+
+export interface GoalOption {
+  id: string;
+  name: string;
 }
 
 interface ContributionFormProps {
   initialValues?: Partial<ContributionFormValues>;
+  goalOptions?: GoalOption[];
   action: (
     prevState: ContributionActionResult | null,
     formData: FormData
@@ -34,7 +40,6 @@ function SubmitButton({
   pendingLabel: string;
 }) {
   const { pending } = useFormStatus();
-
   return (
     <Button type="submit" disabled={pending} className="flex-1">
       {pending ? pendingLabel : label}
@@ -44,26 +49,26 @@ function SubmitButton({
 
 export function ContributionForm({
   initialValues,
+  goalOptions = [],
   action,
   onSuccess,
   onCancel,
   submitLabel = "Registrar aporte",
   pendingLabel = "Registrando...",
 }: ContributionFormProps) {
-  const [state, formAction] = useActionState<
-    ContributionActionResult | null,
-    FormData
-  >(action, null);
+  const [state, formAction] = useActionState<ContributionActionResult | null, FormData>(
+    action,
+    null
+  );
 
   const today = new Date().toISOString().slice(0, 10);
 
   const [amount, setAmount] = useState(initialValues?.amount ?? "");
-
   const [contributionDate, setContributionDate] = useState(
     initialValues?.contributionDate ?? today
   );
-
   const [note, setNote] = useState(initialValues?.note ?? "");
+  const [goalId, setGoalId] = useState(initialValues?.goalId ?? "");
 
   useEffect(() => {
     if (state?.success && onSuccess) {
@@ -75,7 +80,6 @@ export function ContributionForm({
     <form action={formAction} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="amount">Cantidad (L)</Label>
-
         <Input
           id="amount"
           name="amount"
@@ -86,22 +90,16 @@ export function ContributionForm({
           onChange={(e) => setAmount(e.target.value)}
           required
           autoComplete="off"
-          aria-invalid={
-            state?.success === false && !!state.fieldErrors?.amount
-          }
+          aria-invalid={!!state?.fieldErrors?.amount}
           className="tabular-nums text-lg font-semibold"
         />
-
-        {state?.success === false && state.fieldErrors?.amount && (
-          <p className="text-xs text-destructive">
-            {state.fieldErrors.amount[0]}
-          </p>
+        {state?.fieldErrors?.amount && (
+          <p className="text-xs text-destructive">{state.fieldErrors.amount[0]}</p>
         )}
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="contributionDate">Fecha</Label>
-
         <Input
           id="contributionDate"
           name="contributionDate"
@@ -110,23 +108,40 @@ export function ContributionForm({
           onChange={(e) => setContributionDate(e.target.value)}
           max={today}
           required
-          aria-invalid={
-            state?.success === false &&
-            !!state.fieldErrors?.contributionDate
-          }
+          aria-invalid={!!state?.fieldErrors?.contributionDate}
         />
-
-        {state?.success === false &&
-          state.fieldErrors?.contributionDate && (
-            <p className="text-xs text-destructive">
-              {state.fieldErrors.contributionDate[0]}
-            </p>
-          )}
+        {state?.fieldErrors?.contributionDate && (
+          <p className="text-xs text-destructive">
+            {state.fieldErrors.contributionDate[0]}
+          </p>
+        )}
       </div>
+
+      {goalOptions.length > 0 && (
+        <div className="space-y-2">
+          <Label htmlFor="goalId">Meta (opcional)</Label>
+          <select
+            id="goalId"
+            name="goalId"
+            value={goalId}
+            onChange={(e) => setGoalId(e.target.value)}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            <option value="">Sin meta</option>
+            {goalOptions.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-muted-foreground">
+            Solo se muestran metas activas.
+          </p>
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="note">Nota (opcional)</Label>
-
         <textarea
           id="note"
           name="note"
@@ -137,38 +152,24 @@ export function ContributionForm({
           onChange={(e) => setNote(e.target.value)}
           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
         />
-
-        {state?.success === false && state.fieldErrors?.note && (
-          <p className="text-xs text-destructive">
-            {state.fieldErrors.note[0]}
-          </p>
+        {state?.fieldErrors?.note && (
+          <p className="text-xs text-destructive">{state.fieldErrors.note[0]}</p>
         )}
       </div>
 
-      {state?.success === false &&
-        state.error &&
-        !state.fieldErrors && (
-          <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2">
-            <p className="text-xs text-destructive">{state.error}</p>
-          </div>
-        )}
+      {state?.error && !state.fieldErrors && (
+        <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2">
+          <p className="text-xs text-destructive">{state.error}</p>
+        </div>
+      )}
 
       <div className="flex gap-2 pt-2">
         {onCancel && (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onCancel}
-            className="flex-1"
-          >
+          <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
             Cancelar
           </Button>
         )}
-
-        <SubmitButton
-          label={submitLabel}
-          pendingLabel={pendingLabel}
-        />
+        <SubmitButton label={submitLabel} pendingLabel={pendingLabel} />
       </div>
     </form>
   );

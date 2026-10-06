@@ -1,6 +1,6 @@
 "use client";
 
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, Target } from "lucide-react";
 import { formatCurrency, formatDateShort } from "@/utils/format-currency";
 import type { SerializableContribution } from "../types";
 
@@ -35,10 +35,28 @@ export function ContributionItem({
             {formatCurrency(contribution.amount)}
           </p>
         </div>
-        <div className="flex items-center gap-2 mt-0.5">
+        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
           <span className="text-xs text-muted-foreground">
             {formatDateShort(contributionDate)}
           </span>
+
+          {contribution.goal ? (
+            <>
+              <span className="size-0.5 rounded-full bg-muted-foreground" />
+              <span className="inline-flex items-center gap-1 text-xs text-primary">
+                <Target className="size-3" />
+                {contribution.goal.name}
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="size-0.5 rounded-full bg-muted-foreground" />
+              <span className="text-xs text-muted-foreground italic">
+                Sin meta
+              </span>
+            </>
+          )}
+
           {contribution.note && (
             <>
               <span className="size-0.5 rounded-full bg-muted-foreground" />
