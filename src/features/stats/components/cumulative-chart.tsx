@@ -66,14 +66,17 @@ export function CumulativeChart({ data }: CumulativeChartProps) {
                 }}
               />
               <Tooltip
-                formatter={(value: number) => [formatCurrency(value), "Acumulado"]}
-                labelStyle={{ fontSize: 12, fontWeight: 500 }}
-                contentStyle={{
-                  fontSize: 12,
-                  borderRadius: 8,
-                  border: "1px solid oklch(0.90 0.005 90)",
-                }}
-              />
+  formatter={(value) => [
+    formatCurrency(typeof value === "number" ? value : 0),
+    "Acumulado",
+  ]}
+  labelStyle={{ fontSize: 12, fontWeight: 500 }}
+  contentStyle={{
+    fontSize: 12,
+    borderRadius: 8,
+    border: "1px solid oklch(0.90 0.005 90)",
+  }}
+/>
               <Line
                 dataKey="acumulado"
                 stroke="oklch(0.62 0.17 155)"

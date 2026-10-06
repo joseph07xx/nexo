@@ -102,6 +102,13 @@ export async function getContributionById(id: string) {
           email: true,
         },
       },
+      goal: {
+        select: {
+          id: true,
+          name: true,
+          status: true,
+        },
+      },
     },
   });
 }
@@ -184,6 +191,13 @@ export async function createContribution(
             email: true,
           },
         },
+        goal: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+          },
+        },
       },
     });
 
@@ -232,6 +246,13 @@ export async function updateContribution(
             id: true,
             name: true,
             email: true,
+          },
+        },
+        goal: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
           },
         },
       },

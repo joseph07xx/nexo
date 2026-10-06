@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
@@ -5,7 +6,10 @@ import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { upsertMonthlyTargetAction, type MonthlyTargetActionResult } from "../actions";
+import {
+  upsertMonthlyTargetAction,
+  type MonthlyTargetActionResult,
+} from "../actions";
 
 interface MonthlyTargetFormProps {
   year: number;
@@ -25,6 +29,7 @@ function SubmitButton({
   pendingLabel: string;
 }) {
   const { pending } = useFormStatus();
+
   return (
     <Button type="submit" disabled={pending} className="flex-1">
       {pending ? pendingLabel : label}
@@ -35,22 +40,28 @@ function SubmitButton({
 export function MonthlyTargetForm({
   year,
   month,
-  initialAmount,
+  initialAmount = "",
   onSuccess,
   onCancel,
   submitLabel = "Guardar",
   pendingLabel = "Guardando...",
 }: MonthlyTargetFormProps) {
-  const [state, formAction] = useActionState<MonthlyTargetActionResult | null, FormData>(
-    upsertMonthlyTargetAction,
-    null
-  );
+  const [state, formAction] = useActionState<
+    MonthlyTargetActionResult | null,
+    FormData
+  >(upsertMonthlyTargetAction, null);
 
-  const [amount, setAmount] = useState(initialAmount ?? "");
+  const [targetAmount, setTargetAmount] = useState(initialAmount);
+
+  const fieldErrors =
+    state?.success === false ? state.fieldErrors : undefined;
+
+  const error =
+    state?.success === false ? state.error : undefined;
 
   useEffect(() => {
-    if (state?.success && onSuccess) {
-      onSuccess();
+    if (state?.success) {
+      onSuccess?.();
     }
   }, [state?.success, onSuccess]);
 
@@ -60,30 +71,32 @@ export function MonthlyTargetForm({
       <input type="hidden" name="month" value={month} />
 
       <div className="space-y-2">
-        <Label htmlFor="targetAmount">Objetivo mensual (L)</Label>
+        <Label htmlFor="targetAmount">Monto objetivo (L)</Label>
+
         <Input
           id="targetAmount"
           name="targetAmount"
           type="text"
           inputMode="decimal"
           placeholder="0.00"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
+          value={targetAmount}
+          onChange={(e) => setTargetAmount(e.target.value)}
           required
           autoComplete="off"
-          aria-invalid={!!state?.fieldErrors?.targetAmount}
+          aria-invalid={!!fieldErrors?.targetAmount}
           className="tabular-nums text-lg font-semibold"
         />
-        {state?.fieldErrors?.targetAmount && (
+
+        {fieldErrors?.targetAmount && (
           <p className="text-xs text-destructive">
-            {state.fieldErrors.targetAmount[0]}
+            {fieldErrors.targetAmount[0]}
           </p>
         )}
       </div>
 
-      {state?.error && !state.fieldErrors && (
+      {error && !fieldErrors && (
         <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2">
-          <p className="text-xs text-destructive">{state.error}</p>
+          <p className="text-xs text-destructive">{error}</p>
         </div>
       )}
 
@@ -98,7 +111,11 @@ export function MonthlyTargetForm({
             Cancelar
           </Button>
         )}
-        <SubmitButton label={submitLabel} pendingLabel={pendingLabel} />
+
+        <SubmitButton
+          label={submitLabel}
+          pendingLabel={pendingLabel}
+        />
       </div>
     </form>
   );

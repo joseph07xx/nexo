@@ -1,4 +1,3 @@
-
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -46,9 +45,7 @@ async function getAuthenticatedCouple() {
   };
 }
 
-async function getCoupleCreatedAt(
-  coupleId: string
-): Promise<Date | null> {
+async function getCoupleCreatedAt(coupleId: string): Promise<Date | null> {
   const couple = await prisma.couple.findUnique({
     where: {
       id: coupleId,
@@ -93,20 +90,13 @@ export async function createContributionAction(
     };
   }
 
-  const {
-    amount,
-    contributionDate,
-    note,
-    goalId,
-  } = parsed.data;
+  const { amount, contributionDate, note, goalId } = parsed.data;
 
   // ============================================
   // VALIDAR FECHA
   // ============================================
 
-  const coupleCreatedAt = await getCoupleCreatedAt(
-    auth.coupleId
-  );
+  const coupleCreatedAt = await getCoupleCreatedAt(auth.coupleId);
 
   if (!coupleCreatedAt) {
     return {
@@ -121,10 +111,7 @@ export async function createContributionAction(
   );
 
   if (!dateCheck.valid) {
-    const messages: Record<
-      typeof dateCheck.reason,
-      string
-    > = {
+    const messages: Record<typeof dateCheck.reason, string> = {
       FUTURE: "La fecha no puede ser futura",
       BEFORE_COUPLE:
         "La fecha no puede ser anterior a la creación de la pareja",
@@ -134,9 +121,7 @@ export async function createContributionAction(
       success: false,
       error: "Fecha inválida",
       fieldErrors: {
-        contributionDate: [
-          messages[dateCheck.reason],
-        ],
+        contributionDate: [messages[dateCheck.reason]],
       },
     };
   }
@@ -166,8 +151,7 @@ export async function createContributionAction(
     if (goal.status !== "ACTIVE") {
       return {
         success: false,
-        error:
-          "Solo se pueden asociar aportes a metas activas",
+        error: "Solo se pueden asociar aportes a metas activas",
       };
     }
   }
@@ -275,20 +259,13 @@ export async function updateContributionAction(
     };
   }
 
-  const {
-    amount,
-    contributionDate,
-    note,
-    goalId,
-  } = parsed.data;
+  const { amount, contributionDate, note, goalId } = parsed.data;
 
   // ============================================
   // VALIDAR FECHA
   // ============================================
 
-  const coupleCreatedAt = await getCoupleCreatedAt(
-    auth.coupleId
-  );
+  const coupleCreatedAt = await getCoupleCreatedAt(auth.coupleId);
 
   if (!coupleCreatedAt) {
     return {
@@ -303,10 +280,7 @@ export async function updateContributionAction(
   );
 
   if (!dateCheck.valid) {
-    const messages: Record<
-      typeof dateCheck.reason,
-      string
-    > = {
+    const messages: Record<typeof dateCheck.reason, string> = {
       FUTURE: "La fecha no puede ser futura",
       BEFORE_COUPLE:
         "La fecha no puede ser anterior a la creación de la pareja",
@@ -316,9 +290,7 @@ export async function updateContributionAction(
       success: false,
       error: "Fecha inválida",
       fieldErrors: {
-        contributionDate: [
-          messages[dateCheck.reason],
-        ],
+        contributionDate: [messages[dateCheck.reason]],
       },
     };
   }
@@ -348,8 +320,7 @@ export async function updateContributionAction(
     if (goal.status !== "ACTIVE") {
       return {
         success: false,
-        error:
-          "Solo se pueden asociar aportes a metas activas",
+        error: "Solo se pueden asociar aportes a metas activas",
       };
     }
   }
@@ -367,18 +338,25 @@ export async function updateContributionAction(
       goalId,
     });
 
+    // Volvemos a obtener el aporte incluyendo usuario y meta.
+    const updatedWithRelations = await getContributionById(id);
+
+    if (!updatedWithRelations) {
+      return {
+        success: false,
+        error: "No se pudo recuperar el aporte actualizado",
+      };
+    }
+
     revalidatePath("/inicio");
     revalidatePath("/actividad");
 
     return {
       success: true,
-      data: serializeContribution(updated),
+      data: serializeContribution(updatedWithRelations),
     };
   } catch (error) {
-    console.error(
-      "Error al actualizar aporte:",
-      error
-    );
+    console.error("Error al actualizar aporte:", error);
 
     return {
       success: false,
@@ -453,10 +431,7 @@ export async function deleteContributionAction(
       data: undefined,
     };
   } catch (error) {
-    console.error(
-      "Error al eliminar aporte:",
-      error
-    );
+    console.error("Error al eliminar aporte:", error);
 
     return {
       success: false,

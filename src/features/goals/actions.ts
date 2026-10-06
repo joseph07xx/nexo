@@ -24,9 +24,13 @@ import {
 // TIPOS DE RESULTADO
 // ============================================
 
-export type GoalActionResult<T = void> =
+export type GoalActionResult<T = unknown> =
   | { success: true; data: T }
-  | { success: false; error: string; fieldErrors?: Record<string, string[]> };
+  | {
+      success: false;
+      error: string;
+      fieldErrors?: Record<string, string[]>;
+    };
 
 // ============================================
 // HELPERS
@@ -34,9 +38,11 @@ export type GoalActionResult<T = void> =
 
 async function getAuthenticatedCouple() {
   const session = await auth();
+
   if (!session?.user?.id || !session.user.coupleId) {
     return null;
   }
+
   return {
     userId: session.user.id,
     coupleId: session.user.coupleId,
@@ -57,8 +63,12 @@ export async function createGoalAction(
   formData: FormData
 ): Promise<GoalActionResult> {
   const auth = await getAuthenticatedCouple();
+
   if (!auth) {
-    return { success: false, error: "No autenticado o sin pareja" };
+    return {
+      success: false,
+      error: "No autenticado o sin pareja",
+    };
   }
 
   const parsed = createGoalSchema.safeParse({
@@ -79,6 +89,7 @@ export async function createGoalAction(
   const { name, description, targetAmount, targetDate } = parsed.data;
 
   const dateCheck = isValidTargetDate(targetDate);
+
   if (!dateCheck.valid) {
     return {
       success: false,
@@ -100,16 +111,25 @@ export async function createGoalAction(
 
     revalidateGoalPaths();
 
-    return { success: true, data: { id: goal.id } };
+    return {
+      success: true,
+      data: { id: goal.id },
+    };
   } catch (error) {
     if (error instanceof Error && error.message === "GOAL_LIMIT_REACHED") {
       return {
         success: false,
-        error: "Ya tienen 10 metas activas. Archiven o completen alguna antes de crear otra.",
+        error:
+          "Ya tienen 10 metas activas. Archiven o completen alguna antes de crear otra.",
       };
     }
+
     console.error("Error al crear meta:", error);
-    return { success: false, error: "No se pudo crear la meta" };
+
+    return {
+      success: false,
+      error: "No se pudo crear la meta",
+    };
   }
 }
 
@@ -123,13 +143,21 @@ export async function updateGoalAction(
   formData: FormData
 ): Promise<GoalActionResult> {
   const auth = await getAuthenticatedCouple();
+
   if (!auth) {
-    return { success: false, error: "No autenticado o sin pareja" };
+    return {
+      success: false,
+      error: "No autenticado o sin pareja",
+    };
   }
 
   const existing = await getGoalById(id);
+
   if (!existing || existing.coupleId !== auth.coupleId) {
-    return { success: false, error: "Meta no encontrada" };
+    return {
+      success: false,
+      error: "Meta no encontrada",
+    };
   }
 
   if (!canEditGoal(existing.status)) {
@@ -157,6 +185,7 @@ export async function updateGoalAction(
   const { name, description, targetAmount, targetDate } = parsed.data;
 
   const dateCheck = isValidTargetDate(targetDate);
+
   if (!dateCheck.valid) {
     return {
       success: false,
@@ -179,10 +208,17 @@ export async function updateGoalAction(
     revalidateGoalPaths();
     revalidatePath(`/metas/${id}`);
 
-    return { success: true, data: undefined };
+    return {
+      success: true,
+      data: undefined,
+    };
   } catch (error) {
     console.error("Error al actualizar meta:", error);
-    return { success: false, error: "No se pudo actualizar la meta" };
+
+    return {
+      success: false,
+      error: "No se pudo actualizar la meta",
+    };
   }
 }
 
@@ -194,13 +230,21 @@ export async function archiveGoalAction(
   id: string
 ): Promise<GoalActionResult> {
   const auth = await getAuthenticatedCouple();
+
   if (!auth) {
-    return { success: false, error: "No autenticado o sin pareja" };
+    return {
+      success: false,
+      error: "No autenticado o sin pareja",
+    };
   }
 
   const existing = await getGoalById(id);
+
   if (!existing || existing.coupleId !== auth.coupleId) {
-    return { success: false, error: "Meta no encontrada" };
+    return {
+      success: false,
+      error: "Meta no encontrada",
+    };
   }
 
   if (!canArchiveGoal(existing.status)) {
@@ -216,10 +260,17 @@ export async function archiveGoalAction(
     revalidateGoalPaths();
     revalidatePath(`/metas/${id}`);
 
-    return { success: true, data: undefined };
+    return {
+      success: true,
+      data: undefined,
+    };
   } catch (error) {
     console.error("Error al archivar meta:", error);
-    return { success: false, error: "No se pudo archivar la meta" };
+
+    return {
+      success: false,
+      error: "No se pudo archivar la meta",
+    };
   }
 }
 
@@ -231,13 +282,21 @@ export async function unarchiveGoalAction(
   id: string
 ): Promise<GoalActionResult> {
   const auth = await getAuthenticatedCouple();
+
   if (!auth) {
-    return { success: false, error: "No autenticado o sin pareja" };
+    return {
+      success: false,
+      error: "No autenticado o sin pareja",
+    };
   }
 
   const existing = await getGoalById(id);
+
   if (!existing || existing.coupleId !== auth.coupleId) {
-    return { success: false, error: "Meta no encontrada" };
+    return {
+      success: false,
+      error: "Meta no encontrada",
+    };
   }
 
   if (!canUnarchiveGoal(existing.status)) {
@@ -253,9 +312,16 @@ export async function unarchiveGoalAction(
     revalidateGoalPaths();
     revalidatePath(`/metas/${id}`);
 
-    return { success: true, data: undefined };
+    return {
+      success: true,
+      data: undefined,
+    };
   } catch (error) {
     console.error("Error al restaurar meta:", error);
-    return { success: false, error: "No se pudo restaurar la meta" };
+
+    return {
+      success: false,
+      error: "No se pudo restaurar la meta",
+    };
   }
 }

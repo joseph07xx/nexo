@@ -34,6 +34,7 @@ function SubmitButton({
   pendingLabel: string;
 }) {
   const { pending } = useFormStatus();
+
   return (
     <Button type="submit" disabled={pending} className="flex-1">
       {pending ? pendingLabel : label}
@@ -49,10 +50,10 @@ export function GoalForm({
   submitLabel = "Crear meta",
   pendingLabel = "Creando...",
 }: GoalFormProps) {
-  const [state, formAction] = useActionState<GoalActionResult | null, FormData>(
-    action,
-    null
-  );
+  const [state, formAction] = useActionState<
+    GoalActionResult | null,
+    FormData
+  >(action, null);
 
   const [name, setName] = useState(initialValues?.name ?? "");
   const [description, setDescription] = useState(
@@ -65,6 +66,11 @@ export function GoalForm({
     initialValues?.targetDate ?? ""
   );
 
+  const fieldErrors =
+    state?.success === false ? state.fieldErrors : undefined;
+
+  const error = state?.success === false ? state.error : undefined;
+
   useEffect(() => {
     if (state?.success && onSuccess) {
       onSuccess();
@@ -75,6 +81,7 @@ export function GoalForm({
     <form action={formAction} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="name">Nombre</Label>
+
         <Input
           id="name"
           name="name"
@@ -85,15 +92,19 @@ export function GoalForm({
           required
           maxLength={120}
           autoComplete="off"
-          aria-invalid={!!state?.fieldErrors?.name}
+          aria-invalid={!!fieldErrors?.name}
         />
-        {state?.fieldErrors?.name && (
-          <p className="text-xs text-destructive">{state.fieldErrors.name[0]}</p>
+
+        {fieldErrors?.name && (
+          <p className="text-xs text-destructive">
+            {fieldErrors.name[0]}
+          </p>
         )}
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="description">Descripción (opcional)</Label>
+
         <textarea
           id="description"
           name="description"
@@ -104,15 +115,17 @@ export function GoalForm({
           onChange={(e) => setDescription(e.target.value)}
           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
         />
-        {state?.fieldErrors?.description && (
+
+        {fieldErrors?.description && (
           <p className="text-xs text-destructive">
-            {state.fieldErrors.description[0]}
+            {fieldErrors.description[0]}
           </p>
         )}
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="targetAmount">Monto objetivo (L)</Label>
+
         <Input
           id="targetAmount"
           name="targetAmount"
@@ -123,36 +136,39 @@ export function GoalForm({
           onChange={(e) => setTargetAmount(e.target.value)}
           required
           autoComplete="off"
-          aria-invalid={!!state?.fieldErrors?.targetAmount}
+          aria-invalid={!!fieldErrors?.targetAmount}
           className="tabular-nums text-lg font-semibold"
         />
-        {state?.fieldErrors?.targetAmount && (
+
+        {fieldErrors?.targetAmount && (
           <p className="text-xs text-destructive">
-            {state.fieldErrors.targetAmount[0]}
+            {fieldErrors.targetAmount[0]}
           </p>
         )}
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="targetDate">Fecha objetivo (opcional)</Label>
+
         <Input
           id="targetDate"
           name="targetDate"
           type="date"
           value={targetDate}
           onChange={(e) => setTargetDate(e.target.value)}
-          aria-invalid={!!state?.fieldErrors?.targetDate}
+          aria-invalid={!!fieldErrors?.targetDate}
         />
-        {state?.fieldErrors?.targetDate && (
+
+        {fieldErrors?.targetDate && (
           <p className="text-xs text-destructive">
-            {state.fieldErrors.targetDate[0]}
+            {fieldErrors.targetDate[0]}
           </p>
         )}
       </div>
 
-      {state?.error && !state.fieldErrors && (
+      {error && !fieldErrors && (
         <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2">
-          <p className="text-xs text-destructive">{state.error}</p>
+          <p className="text-xs text-destructive">{error}</p>
         </div>
       )}
 
@@ -167,7 +183,11 @@ export function GoalForm({
             Cancelar
           </Button>
         )}
-        <SubmitButton label={submitLabel} pendingLabel={pendingLabel} />
+
+        <SubmitButton
+          label={submitLabel}
+          pendingLabel={pendingLabel}
+        />
       </div>
     </form>
   );
