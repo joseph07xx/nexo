@@ -33,9 +33,10 @@ model User {
   accounts Account[]
   sessions Session[]
 
-  // NEXO - Relación de pareja
+  // NEXO
   coupleMember    CoupleMember?
   invitationsSent CoupleInvitation[]
+  contributions   SavingsContribution[]
 }
 
 // ============================================
@@ -48,8 +49,10 @@ model Couple {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  members     CoupleMember[]
-  invitations CoupleInvitation[]
+  members       CoupleMember[]
+  invitations   CoupleInvitation[]
+  contributions SavingsContribution[]
+  goals         SavingsGoal[]
 }
 
 // ============================================
@@ -86,6 +89,49 @@ model CoupleInvitation {
 
   couple    Couple @relation(fields: [coupleId], references: [id], onDelete: Cascade)
   createdBy User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([coupleId])
+}
+
+// ============================================
+// APORTES
+// ============================================
+
+model SavingsContribution {
+  id               String   @id @default(cuid())
+  coupleId         String
+  userId           String
+  goalId           String?
+  amount           Decimal  @db.Decimal(14, 2)
+  note             String?  @db.VarChar(280)
+  contributionDate DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  couple Couple       @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goal   SavingsGoal? @relation(fields: [goalId], references: [id], onDelete: SetNull)
+
+  @@index([coupleId, contributionDate])
+  @@index([userId])
+  @@index([goalId])
+}
+
+// ============================================
+// METAS (infraestructura mínima - UI en Fase 5)
+// ============================================
+
+model SavingsGoal {
+  id           String   @id @default(cuid())
+  coupleId     String
+  name         String
+  targetAmount Decimal  @db.Decimal(14, 2)
+  status       String   @default("ACTIVE")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  couple        Couple                @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  contributions SavingsContribution[]
 
   @@index([coupleId])
 }
