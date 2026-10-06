@@ -15,7 +15,13 @@ import {
   getActiveGoalsForSelect,
   countGoalsByStatus,
 } from "@/features/goals/data";
+import {
+  getMonthlyTarget,
+  getMonthlySavedTotal,
+} from "@/features/monthly-targets/data";
 import { calculateGoalProgress } from "@/services/goals";
+import { calculateMonthlyProgress } from "@/services/monthly-target";
+import { MonthlyTargetCard } from "@/features/monthly-targets/components/monthly-target-card";
 import { formatCurrency, formatDateShort } from "@/utils/format-currency";
 
 export default async function InicioPage() {
@@ -67,15 +73,29 @@ export default async function InicioPage() {
 
   const coupleId = session.user.coupleId;
 
-  const [totals, recent, primaryGoalData, goalOptions, goalCounts] = await Promise.all([
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+
+  const [
+    totals,
+    recent,
+    primaryGoalData,
+    goalOptions,
+    goalCounts,
+    monthlyTarget,
+    monthlySaved,
+  ] = await Promise.all([
     getDashboardTotals(coupleId),
     getRecentContributions(coupleId, 5),
     getPrimaryGoalWithProgress(coupleId),
     getActiveGoalsForSelect(coupleId),
     countGoalsByStatus(coupleId),
+    getMonthlyTarget(coupleId, currentYear, currentMonth),
+    getMonthlySavedTotal(coupleId, currentYear, currentMonth),
   ]);
 
-  // Calcular progreso de la meta principal
+  // Progreso de meta principal
   let primaryGoal: {
     name: string;
     currentAmount: string;
@@ -101,6 +121,51 @@ export default async function InicioPage() {
     };
   }
 
+  // Progreso mensual (objetivo vs ahorrado)
+  let monthlyProgress:
+    | {
+        year: number;
+        month: number;
+        totalSaved: string;
+        targetAmount: string;
+        percentage: string;
+        remaining: string;
+        isComplete: boolean;
+        hasTarget: boolean;
+      }
+    | null = null;
+
+  const savedThisMonthStr = monthlySaved.toFixed(2);
+
+  if (monthlyTarget) {
+    const mProgress = calculateMonthlyProgress(
+      monthlySaved,
+      monthlyTarget.targetAmount
+    );
+
+    monthlyProgress = {
+      year: currentYear,
+      month: currentMonth,
+      totalSaved: savedThisMonthStr,
+      targetAmount: monthlyTarget.targetAmount.toFixed(2),
+      percentage: mProgress.percentage.toFixed(2),
+      remaining: mProgress.remaining.toFixed(2),
+      isComplete: mProgress.isComplete,
+      hasTarget: true,
+    };
+  } else {
+    monthlyProgress = {
+      year: currentYear,
+      month: currentMonth,
+      totalSaved: savedThisMonthStr,
+      targetAmount: "0.00",
+      percentage: "0.00",
+      remaining: "0.00",
+      isComplete: false,
+      hasTarget: false,
+    };
+  }
+
   return (
     <div className="space-y-6">
       <header className="flex items-center justify-between gap-3">
@@ -111,7 +176,7 @@ export default async function InicioPage() {
               Buenos días, {firstName}
             </h1>
             <p className="text-sm text-muted-foreground truncate">
-              Este mes llevan {formatCurrency(totals.totalThisMonth)}
+              Este mes llevan {formatCurrency(savedThisMonthStr)}
             </p>
           </div>
         </div>
@@ -126,10 +191,12 @@ export default async function InicioPage() {
             {formatCurrency(totals.totalAllTime)}
           </p>
           <div className="flex items-center gap-2 mt-4 text-sm opacity-90">
-            <span>Este mes: {formatCurrency(totals.totalThisMonth)}</span>
+            <span>Este mes: {formatCurrency(savedThisMonthStr)}</span>
           </div>
         </CardContent>
       </Card>
+
+      {monthlyProgress && <MonthlyTargetCard progress={monthlyProgress} />}
 
       {totals.byUserThisMonth.length > 0 && (
         <ContributionSummary
@@ -142,7 +209,6 @@ export default async function InicioPage() {
         />
       )}
 
-      {/* Meta principal */}
       <Card>
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-base">Meta principal</CardTitle>
@@ -200,16 +266,20 @@ export default async function InicioPage() {
 
           {goalCounts.active > 0 && (
             <p className="text-xs text-muted-foreground mt-4 pt-3 border-t border-border">
-              {goalCounts.active} {goalCounts.active === 1 ? "meta activa" : "metas activas"}
+              {goalCounts.active}{" "}
+              {goalCounts.active === 1 ? "meta activa" : "metas activas"}
               {goalCounts.completed > 0 && (
-                <> · {goalCounts.completed} {goalCounts.completed === 1 ? "completada" : "completadas"}</>
+                <>
+                  {" · "}
+                  {goalCounts.completed}{" "}
+                  {goalCounts.completed === 1 ? "completada" : "completadas"}
+                </>
               )}
             </p>
           )}
         </CardContent>
       </Card>
 
-      {/* Actividad reciente */}
       <Card>
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-base">Actividad reciente</CardTitle>
@@ -249,10 +319,7 @@ export default async function InicioPage() {
         </CardContent>
       </Card>
 
-      <CreateContributionButton
-        className="w-full"
-        goalOptions={goalOptions}
-      />
+      <CreateContributionButton className="w-full" goalOptions={goalOptions} />
     </div>
   );
 }

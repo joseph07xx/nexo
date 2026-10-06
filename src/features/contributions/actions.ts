@@ -152,6 +152,7 @@ export async function createContributionAction(
       },
       select: {
         coupleId: true,
+        status: true,
       },
     });
 
@@ -159,6 +160,14 @@ export async function createContributionAction(
       return {
         success: false,
         error: "Meta inválida",
+      };
+    }
+
+    if (goal.status !== "ACTIVE") {
+      return {
+        success: false,
+        error:
+          "Solo se pueden asociar aportes a metas activas",
       };
     }
   }
@@ -325,6 +334,7 @@ export async function updateContributionAction(
       },
       select: {
         coupleId: true,
+        status: true,
       },
     });
 
@@ -332,6 +342,14 @@ export async function updateContributionAction(
       return {
         success: false,
         error: "Meta inválida",
+      };
+    }
+
+    if (goal.status !== "ACTIVE") {
+      return {
+        success: false,
+        error:
+          "Solo se pueden asociar aportes a metas activas",
       };
     }
   }

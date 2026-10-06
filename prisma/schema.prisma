@@ -59,6 +59,8 @@ model Couple {
   invitations   CoupleInvitation[]
   contributions SavingsContribution[]
   goals         SavingsGoal[]
+  monthlyTargets MonthlyTarget[]
+
 }
 
 // ============================================
@@ -184,4 +186,23 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+// ============================================
+// OBJETIVO MENSUAL DE AHORRO
+// ============================================
+
+model MonthlyTarget {
+  id           String   @id @default(cuid())
+  coupleId     String
+  year         Int
+  month        Int
+  targetAmount Decimal  @db.Decimal(14, 2)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  couple Couple @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+
+  @@unique([coupleId, year, month])
+  @@index([coupleId])
 }
