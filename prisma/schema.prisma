@@ -1,0 +1,130 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum CoupleRole {
+  OWNER
+  MEMBER
+}
+
+// ============================================
+// USUARIO (Auth.js + NEXO)
+// ============================================
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  passwordHash  String
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Auth.js
+  accounts Account[]
+  sessions Session[]
+
+  // NEXO - Relación de pareja
+  coupleMember    CoupleMember?
+  invitationsSent CoupleInvitation[]
+}
+
+// ============================================
+// PAREJA
+// ============================================
+
+model Couple {
+  id          String   @id @default(cuid())
+  memberCount Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members     CoupleMember[]
+  invitations CoupleInvitation[]
+}
+
+// ============================================
+// MIEMBRO DE PAREJA
+// ============================================
+
+model CoupleMember {
+  id       String     @id @default(cuid())
+  coupleId String
+  userId   String     @unique
+  role     CoupleRole @default(MEMBER)
+  joinedAt DateTime   @default(now())
+
+  couple Couple @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([coupleId, userId])
+  @@index([coupleId])
+}
+
+// ============================================
+// INVITACIÓN DE PAREJA
+// ============================================
+
+model CoupleInvitation {
+  id          String    @id @default(cuid())
+  coupleId    String
+  code        String    @unique
+  createdById String
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  couple    Couple @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  createdBy User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([coupleId])
+}
+
+// ============================================
+// MODELOS DE AUTH.JS
+// ============================================
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
