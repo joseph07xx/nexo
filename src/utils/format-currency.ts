@@ -6,7 +6,6 @@ import { Prisma } from "@prisma/client";
  * Solo para presentación. Nunca usar el resultado
  * para volver a hacer cálculos.
  */
-import { Prisma } from "@prisma/client";
 
 export function formatCurrency(
   amount: Prisma.Decimal | string | number

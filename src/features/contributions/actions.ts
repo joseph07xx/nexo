@@ -20,7 +20,7 @@ import { serializeContribution } from "./types";
 // TIPOS DE RESULTADO
 // ============================================
 
-export type ContributionActionResult<T = void> =
+export type ContributionActionResult<T = unknown> =
   | { success: true; data: T }
   | { success: false; error: string; fieldErrors?: Record<string, string[]> };
 
