@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+export const ALLOWED_EMAIL_DOMAIN = "@nexo.com";
+export const RESERVED_ADMIN_EMAIL = "admin@nexo.com";
+
 export const registerSchema = z
   .object({
     name: z
@@ -25,15 +28,36 @@ export const registerSchema = z
   .refine((data) => data.password === data.confirmPassword, {
     message: "Las contraseñas no coinciden",
     path: ["confirmPassword"],
+  })
+  .superRefine((data, context) => {
+    if (!data.email.endsWith(ALLOWED_EMAIL_DOMAIN)) {
+      context.addIssue({
+        code: "custom",
+        message: "Solo se permiten correos @nexo.com",
+        path: ["email"],
+      });
+    }
+
+    if (data.email === RESERVED_ADMIN_EMAIL) {
+      context.addIssue({
+        code: "custom",
+        message: "Esta dirección está reservada y no puede registrarse desde aquí",
+        path: ["email"],
+      });
+    }
   });
 
 export const loginSchema = z.object({
   email: z
     .string()
     .email("Correo electrónico inválido")
+    .max(255, "El correo es demasiado largo")
     .toLowerCase()
     .trim(),
-  password: z.string().min(1, "La contraseña es requerida"),
+  password: z
+    .string()
+    .min(1, "La contraseña es requerida")
+    .max(100, "La contraseña es demasiado larga"),
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;

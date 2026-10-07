@@ -54,7 +54,10 @@ export const createContributionSchema = z.object({
   goalId: z.string().cuid().optional().nullable(),
 });
 
-export const updateContributionSchema = createContributionSchema;
+export const createWithdrawalSchema = z.object({
+  amount: amountSchema,
+  note: noteSchema,
+  goalId: z.string().cuid().optional().nullable(),
+});
 
 export type CreateContributionInput = z.infer<typeof createContributionSchema>;
-export type UpdateContributionInput = z.infer<typeof updateContributionSchema>;

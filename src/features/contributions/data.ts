@@ -12,6 +12,9 @@ const CONTRIBUTION_PAGE_SIZE = 20;
 export interface ListContributionsOptions {
   coupleId: string;
   userId?: string;
+  goalId?: string;
+  contributionId?: string;
+  withdrawalId?: string;
   fromDate?: Date;
   toDate?: Date;
   page?: number;
@@ -20,6 +23,8 @@ export interface ListContributionsOptions {
 export async function listContributions({
   coupleId,
   userId,
+  goalId,
+  contributionId,
   fromDate,
   toDate,
   page = 1,
@@ -28,6 +33,14 @@ export async function listContributions({
 
   if (userId) {
     where.userId = userId;
+  }
+
+  if (goalId) {
+    where.goalId = goalId;
+  }
+
+  if (contributionId) {
+    where.id = contributionId;
   }
 
   if (fromDate || toDate) {
@@ -75,6 +88,104 @@ export async function listContributions({
       where,
     }),
   ]);
+
+  return {
+    items,
+    total,
+    page,
+    pageSize: CONTRIBUTION_PAGE_SIZE,
+    totalPages: Math.ceil(total / CONTRIBUTION_PAGE_SIZE),
+  };
+}
+
+export async function listFinancialMovements({
+  coupleId,
+  goalId,
+  contributionId,
+  withdrawalId,
+  fromDate,
+  toDate,
+  page = 1,
+}: ListContributionsOptions) {
+  const contributionWhere: Prisma.SavingsContributionWhereInput = { coupleId };
+  const withdrawalWhere: Prisma.SavingsWithdrawalWhereInput = { coupleId };
+  const skip = (page - 1) * CONTRIBUTION_PAGE_SIZE;
+  const take = skip + CONTRIBUTION_PAGE_SIZE;
+
+  if (goalId !== undefined) {
+    contributionWhere.goalId = goalId;
+    withdrawalWhere.goalId = goalId;
+  }
+
+  if (contributionId) contributionWhere.id = contributionId;
+  if (withdrawalId) withdrawalWhere.id = withdrawalId;
+
+  if (fromDate || toDate) {
+    contributionWhere.contributionDate = {};
+    withdrawalWhere.withdrawalDate = {};
+    if (fromDate) {
+      contributionWhere.contributionDate.gte = fromDate;
+      withdrawalWhere.withdrawalDate.gte = fromDate;
+    }
+    if (toDate) {
+      contributionWhere.contributionDate.lte = toDate;
+      withdrawalWhere.withdrawalDate.lte = toDate;
+    }
+  }
+
+  const [contributions, withdrawals, contributionCount, withdrawalCount] = await Promise.all([
+    withdrawalId
+      ? Promise.resolve([])
+      : prisma.savingsContribution.findMany({
+      where: contributionWhere,
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+        goal: { select: { id: true, name: true, status: true } },
+      },
+      orderBy: [{ contributionDate: "desc" }, { createdAt: "desc" }],
+      take,
+    }),
+      contributionId
+      ? Promise.resolve([])
+      : prisma.savingsWithdrawal.findMany({
+          where: withdrawalWhere,
+          include: {
+            user: { select: { id: true, name: true, email: true } },
+            goal: { select: { id: true, name: true, status: true } },
+          },
+          orderBy: [{ withdrawalDate: "desc" }, { createdAt: "desc" }],
+          take,
+        }),
+    contributionId
+      ? prisma.savingsContribution.count({ where: contributionWhere })
+      : withdrawalId
+        ? Promise.resolve(0)
+      : prisma.savingsContribution.count({ where: contributionWhere }),
+    withdrawalId
+      ? prisma.savingsWithdrawal.count({ where: withdrawalWhere })
+      : contributionId
+        ? Promise.resolve(0)
+      : prisma.savingsWithdrawal.count({ where: withdrawalWhere }),
+  ]);
+
+  const movements = [
+    ...contributions.map((contribution) => ({
+      ...contribution,
+      kind: "CONTRIBUTION" as const,
+      movementAt: contribution.contributionDate,
+    })),
+    ...withdrawals.map((withdrawal) => ({
+      ...withdrawal,
+      kind: "WITHDRAWAL" as const,
+      movementAt: withdrawal.withdrawalDate,
+    })),
+  ].sort((first, second) => {
+    const dateDifference = second.movementAt.getTime() - first.movementAt.getTime();
+    return dateDifference || second.createdAt.getTime() - first.createdAt.getTime();
+  });
+
+  const total = contributionCount + withdrawalCount;
+  const items = movements.slice(skip, skip + CONTRIBUTION_PAGE_SIZE);
 
   return {
     items,
@@ -157,6 +268,133 @@ export async function getRecentContributions(
   });
 }
 
+export async function getWithdrawalSources(coupleId: string) {
+  const [goals, contributionTotals, withdrawalTotals] = await Promise.all([
+    prisma.savingsGoal.findMany({
+      where: { coupleId },
+      select: { id: true, name: true, status: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.savingsContribution.groupBy({
+      by: ["goalId"],
+      where: { coupleId },
+      _sum: { amount: true },
+    }),
+    prisma.savingsWithdrawal.groupBy({
+      by: ["goalId"],
+      where: { coupleId },
+      _sum: { amount: true },
+    }),
+  ]);
+
+  const contributionsByGoal = new Map(
+    contributionTotals.map((item) => [item.goalId, item._sum.amount ?? new Prisma.Decimal(0)])
+  );
+  const withdrawalsByGoal = new Map(
+    withdrawalTotals.map((item) => [item.goalId, item._sum.amount ?? new Prisma.Decimal(0)])
+  );
+  const sources = [
+    {
+      goalId: null,
+      name: "Aportes sin meta",
+      balance: (contributionsByGoal.get(null) ?? new Prisma.Decimal(0))
+        .minus(withdrawalsByGoal.get(null) ?? new Prisma.Decimal(0)),
+    },
+    ...goals.map((goal) => ({
+      goalId: goal.id,
+      name: goal.name,
+      balance: (contributionsByGoal.get(goal.id) ?? new Prisma.Decimal(0))
+        .minus(withdrawalsByGoal.get(goal.id) ?? new Prisma.Decimal(0)),
+    })),
+  ];
+
+  return sources
+    .filter((source) => source.balance.greaterThan(0))
+    .map((source) => ({
+      goalId: source.goalId,
+      name: source.name,
+      available: source.balance.toFixed(2),
+    }));
+}
+
+export async function getAvailableWithdrawalBalance(
+  coupleId: string,
+  goalId: string | null,
+  db: Prisma.TransactionClient = prisma
+) {
+  const where = { coupleId, goalId };
+  const [contributions, withdrawals] = await Promise.all([
+    db.savingsContribution.aggregate({ where, _sum: { amount: true } }),
+    db.savingsWithdrawal.aggregate({ where, _sum: { amount: true } }),
+  ]);
+
+  return (contributions._sum.amount ?? new Prisma.Decimal(0))
+    .minus(withdrawals._sum.amount ?? new Prisma.Decimal(0));
+}
+
+export interface CreateWithdrawalData {
+  coupleId: string;
+  userId: string;
+  goalId: string | null;
+  amount: Prisma.Decimal;
+  note?: string;
+}
+
+export async function createWithdrawalWithBalanceCheck(data: CreateWithdrawalData) {
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${data.coupleId}))`;
+
+    const available = await getAvailableWithdrawalBalance(
+      data.coupleId,
+      data.goalId,
+      tx
+    );
+
+    if (data.amount.greaterThan(available)) {
+      throw new Error("INSUFFICIENT_WITHDRAWAL_BALANCE");
+    }
+
+    const withdrawal = await tx.savingsWithdrawal.create({
+      data: {
+        coupleId: data.coupleId,
+        userId: data.userId,
+        goalId: data.goalId,
+        amount: data.amount,
+        note: data.note,
+      },
+      include: {
+        user: { select: { id: true, name: true } },
+        goal: { select: { id: true, name: true, status: true } },
+      },
+    });
+
+    const recipients = await tx.coupleMember.findMany({
+      where: {
+        coupleId: data.coupleId,
+        userId: { not: data.userId },
+      },
+      select: { userId: true },
+    });
+
+    if (recipients.length > 0) {
+      await tx.inAppNotification.createMany({
+        data: recipients.map((recipient) => ({
+          recipientId: recipient.userId,
+          actorId: data.userId,
+          withdrawalId: withdrawal.id,
+          type: "WITHDRAWAL_CREATED",
+        })),
+      });
+    }
+
+    if (data.goalId) {
+      await reconcileGoalStatus(tx, data.goalId);
+    }
+
+    return withdrawal;
+  });
+}
+
 // ============================================
 // MUTACIONES
 // ============================================
@@ -201,75 +439,30 @@ export async function createContribution(
       },
     });
 
-    if (data.goalId) {
-      await reconcileGoalStatus(tx, data.goalId);
-    }
-
-    return contribution;
-  });
-}
-
-export interface UpdateContributionData {
-  id: string;
-  amount: Prisma.Decimal;
-  contributionDate: Date;
-  note?: string;
-  goalId?: string | null;
-}
-
-export async function updateContribution(
-  data: UpdateContributionData
-) {
-  return prisma.$transaction(async (tx) => {
-    const previous = await tx.savingsContribution.findUnique({
+    const recipients = await tx.coupleMember.findMany({
       where: {
-        id: data.id,
+        coupleId: data.coupleId,
+        userId: { not: data.userId },
       },
-      select: {
-        goalId: true,
-      },
+      select: { userId: true },
     });
 
-    const updated = await tx.savingsContribution.update({
-      where: {
-        id: data.id,
-      },
-      data: {
-        amount: data.amount,
-        contributionDate: data.contributionDate,
-        note: data.note,
-        goalId: data.goalId ?? null,
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        goal: {
-          select: {
-            id: true,
-            name: true,
-            status: true,
-          },
-        },
-      },
-    });
-
-    if (
-      previous?.goalId &&
-      previous.goalId !== data.goalId
-    ) {
-      await reconcileGoalStatus(tx, previous.goalId);
+    if (recipients.length > 0) {
+      await tx.inAppNotification.createMany({
+        data: recipients.map((recipient) => ({
+          recipientId: recipient.userId,
+          actorId: data.userId,
+          contributionId: contribution.id,
+          type: "CONTRIBUTION_CREATED",
+        })),
+      });
     }
 
     if (data.goalId) {
       await reconcileGoalStatus(tx, data.goalId);
     }
 
-    return updated;
+    return contribution;
   });
 }
 
@@ -280,9 +473,25 @@ export async function deleteContribution(id: string) {
         id,
       },
       select: {
+        coupleId: true,
         goalId: true,
+        amount: true,
       },
     });
+
+    if (!existing) return null;
+
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${existing.coupleId}))`;
+
+    const available = await getAvailableWithdrawalBalance(
+      existing.coupleId,
+      existing.goalId,
+      tx
+    );
+
+    if (available.lessThan(existing.amount)) {
+      throw new Error("CONTRIBUTION_HAS_WITHDRAWALS");
+    }
 
     const deleted = await tx.savingsContribution.delete({
       where: {
@@ -334,7 +543,9 @@ export async function getDashboardTotals(
 
   const [
     allContributions,
+    allWithdrawals,
     monthContributions,
+    monthWithdrawals,
     members,
   ] = await Promise.all([
     prisma.savingsContribution.findMany({
@@ -344,6 +555,11 @@ export async function getDashboardTotals(
       select: {
         amount: true,
       },
+    }),
+
+    prisma.savingsWithdrawal.findMany({
+      where: { coupleId },
+      select: { amount: true },
     }),
 
     prisma.savingsContribution.findMany({
@@ -358,6 +574,14 @@ export async function getDashboardTotals(
         amount: true,
         userId: true,
       },
+    }),
+
+    prisma.savingsWithdrawal.findMany({
+      where: {
+        coupleId,
+        withdrawalDate: { gte: startOfMonth, lte: endOfMonth },
+      },
+      select: { amount: true, userId: true },
     }),
 
     prisma.coupleMember.findMany({
@@ -379,16 +603,26 @@ export async function getDashboardTotals(
     (acc, contribution) =>
       acc.plus(contribution.amount),
     new Prisma.Decimal(0)
+  ).minus(
+    allWithdrawals.reduce(
+      (acc, withdrawal) => acc.plus(withdrawal.amount),
+      new Prisma.Decimal(0)
+    )
   );
 
   const totalThisMonth = monthContributions.reduce(
     (acc, contribution) =>
       acc.plus(contribution.amount),
     new Prisma.Decimal(0)
+  ).minus(
+    monthWithdrawals.reduce(
+      (acc, withdrawal) => acc.plus(withdrawal.amount),
+      new Prisma.Decimal(0)
+    )
   );
 
   const byUserThisMonth = members.map((member) => {
-    const userTotal = monthContributions
+    const contributionTotal = monthContributions
       .filter(
         (contribution) =>
           contribution.userId === member.userId
@@ -398,11 +632,10 @@ export async function getDashboardTotals(
           acc.plus(contribution.amount),
         new Prisma.Decimal(0)
       );
-
     return {
       userId: member.userId,
       name: member.user.name,
-      total: userTotal,
+      total: contributionTotal,
     };
   });
 

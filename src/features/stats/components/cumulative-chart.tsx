@@ -49,15 +49,15 @@ export function CumulativeChart({ data }: CumulativeChartProps) {
         <div className="w-full h-64">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.90 0.005 90)" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
               <XAxis
                 dataKey="label"
-                tick={{ fontSize: 11, fill: "oklch(0.52 0.01 260)" }}
+                tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fontSize: 11, fill: "oklch(0.52 0.01 260)" }}
+                tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
                 axisLine={false}
                 tickLine={false}
                 tickFormatter={(v) => {
@@ -74,14 +74,14 @@ export function CumulativeChart({ data }: CumulativeChartProps) {
   contentStyle={{
     fontSize: 12,
     borderRadius: 8,
-    border: "1px solid oklch(0.90 0.005 90)",
+    border: "1px solid var(--color-border)",
   }}
 />
               <Line
                 dataKey="acumulado"
-                stroke="oklch(0.62 0.17 155)"
+                stroke="var(--color-secondary)"
                 strokeWidth={2.5}
-                dot={{ r: 3, fill: "oklch(0.62 0.17 155)" }}
+                dot={{ r: 3, fill: "var(--color-secondary)" }}
                 type="monotone"
               />
             </LineChart>

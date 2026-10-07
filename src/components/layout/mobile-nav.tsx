@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { mobileNavItems } from "./nav-items";
 
-export function MobileNav() {
+export function MobileNav({ unreadNotificationCount }: { unreadNotificationCount: number }) {
   const pathname = usePathname();
 
   return (
@@ -24,7 +24,14 @@ export function MobileNav() {
                 isActive ? "text-primary" : "text-muted-foreground"
               )}
             >
-              <Icon className="size-5" strokeWidth={isActive ? 2.5 : 2} />
+              <span className="relative">
+                <Icon className="size-5" strokeWidth={isActive ? 2.5 : 2} />
+                {item.href === "/actividad" && unreadNotificationCount > 0 && (
+                  <span className="absolute -right-2 -top-1 grid min-w-4 place-items-center rounded-full bg-primary px-1 text-[9px] font-bold leading-4 text-primary-foreground">
+                    {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
+                  </span>
+                )}
+              </span>
               <span className="text-[11px] font-medium truncate max-w-full px-1">
                 {item.label}
               </span>

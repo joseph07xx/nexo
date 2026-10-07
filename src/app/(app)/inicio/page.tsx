@@ -1,11 +1,9 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { NexoLogo } from "@/components/brand/nexo-logo";
-import { ArrowRight, Info, Target } from "lucide-react";
-import { CreateContributionButton } from "@/features/contributions/components/create-contribution-button";
-import { ContributionSummary } from "@/features/contributions/components/contribution-summary";
+import { Card, CardContent } from "@/components/ui/card";
+import { Info } from "lucide-react";
+import { HomeCockpit } from "@/features/home/components/home-cockpit";
 import {
   getDashboardTotals,
   getRecentContributions,
@@ -21,8 +19,7 @@ import {
 } from "@/features/monthly-targets/data";
 import { calculateGoalProgress } from "@/services/goals";
 import { calculateMonthlyProgress } from "@/services/monthly-target";
-import { MonthlyTargetCard } from "@/features/monthly-targets/components/monthly-target-card";
-import { formatCurrency, formatDateShort } from "@/utils/format-currency";
+import { getGreetingForTime } from "@/utils/format-currency";
 
 export default async function InicioPage() {
   const session = await auth();
@@ -30,62 +27,40 @@ export default async function InicioPage() {
     redirect("/login");
   }
 
-  const hasCouple = !!session.user.coupleId;
-  const userName = session.user.name ?? "Usuario";
-  const firstName = userName.split(" ")[0];
+  const firstName = (session.user.name ?? "Usuario").split(" ")[0];
+  const greeting = getGreetingForTime();
+  const coupleId = session.user.coupleId;
 
-  if (!hasCouple || !session.user.coupleId) {
+  if (!coupleId) {
     return (
       <div className="space-y-6">
         <header>
-          <h1 className="text-xl font-semibold tracking-tight">
-            Buenos días, {firstName}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Aún no tienes pareja en NEXO
-          </p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">NEXO · TABLERO DEL HOGAR</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">{greeting}, {firstName}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Aún no tienes pareja en NEXO.</p>
         </header>
-
-        <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 flex items-start gap-3">
-          <Info className="size-4 text-primary shrink-0 mt-0.5" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm text-foreground">Aún no tienes pareja en NEXO.</p>
-            <Link
-              href="/perfil"
-              className="text-sm font-medium text-primary hover:underline"
-            >
-              Creen una para empezar a ahorrar juntos →
-            </Link>
+        <div className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
+          <Info className="mt-0.5 size-4 shrink-0 text-primary" />
+          <div>
+            <p className="text-sm text-foreground">Crea o únete a una pareja para comenzar a ahorrar juntos.</p>
+            <Link href="/perfil" className="mt-1 inline-block text-sm font-medium text-primary hover:underline">Configurar pareja <span aria-hidden="true">→</span></Link>
           </div>
         </div>
-
-        <Card className="bg-primary text-primary-foreground border-0">
-          <CardContent className="pt-6">
-            <p className="text-sm font-medium opacity-80 uppercase tracking-wide">
-              Nuestro ahorro
-            </p>
-            <p className="text-4xl font-bold tabular-nums mt-1">L 0.00</p>
+        <Card className="border-0 bg-primary text-primary-foreground">
+          <CardContent className="py-6">
+            <p className="text-sm font-medium text-primary-foreground/75">Ahorro compartido</p>
+            <p className="mt-2 text-4xl font-semibold tabular-nums">L 0.00</p>
           </CardContent>
         </Card>
       </div>
     );
   }
 
-  const coupleId = session.user.coupleId;
-
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
 
-  const [
-    totals,
-    recent,
-    primaryGoalData,
-    goalOptions,
-    goalCounts,
-    monthlyTarget,
-    monthlySaved,
-  ] = await Promise.all([
+  const [totals, recent, primaryGoalData, goalOptions, goalCounts, monthlyTarget, monthlySaved] = await Promise.all([
     getDashboardTotals(coupleId),
     getRecentContributions(coupleId, 5),
     getPrimaryGoalWithProgress(coupleId),
@@ -95,231 +70,78 @@ export default async function InicioPage() {
     getMonthlySavedTotal(coupleId, currentYear, currentMonth),
   ]);
 
-  // Progreso de meta principal
-  let primaryGoal: {
-    name: string;
-    currentAmount: string;
-    targetAmount: string;
-    percentage: string;
-    remaining: string;
-    isComplete: boolean;
-  } | null = null;
+  const primaryGoal = primaryGoalData
+    ? (() => {
+        const progress = calculateGoalProgress(
+          primaryGoalData.currentAmount,
+          primaryGoalData.goal.targetAmount
+        );
 
-  if (primaryGoalData) {
-    const progress = calculateGoalProgress(
-      primaryGoalData.currentAmount,
-      primaryGoalData.goal.targetAmount
-    );
+        return {
+          id: primaryGoalData.goal.id,
+          name: primaryGoalData.goal.name,
+          currentAmount: primaryGoalData.currentAmount.toFixed(2),
+          targetAmount: primaryGoalData.goal.targetAmount.toFixed(2),
+          percentage: progress.percentage.toFixed(2),
+          remaining: progress.remaining.toFixed(2),
+          isComplete: progress.isComplete,
+          targetDate: primaryGoalData.goal.targetDate?.toISOString() ?? null,
+        };
+      })()
+    : null;
 
-    primaryGoal = {
-      name: primaryGoalData.goal.name,
-      currentAmount: primaryGoalData.currentAmount.toFixed(2),
-      targetAmount: primaryGoalData.goal.targetAmount.toFixed(2),
-      percentage: progress.percentage.toFixed(2),
-      remaining: progress.remaining.toFixed(2),
-      isComplete: progress.isComplete,
-    };
-  }
-
-  // Progreso mensual (objetivo vs ahorrado)
-  let monthlyProgress:
-    | {
-        year: number;
-        month: number;
-        totalSaved: string;
-        targetAmount: string;
-        percentage: string;
-        remaining: string;
-        isComplete: boolean;
-        hasTarget: boolean;
-      }
-    | null = null;
-
-  const savedThisMonthStr = monthlySaved.toFixed(2);
-
-  if (monthlyTarget) {
-    const mProgress = calculateMonthlyProgress(
-      monthlySaved,
-      monthlyTarget.targetAmount
-    );
-
-    monthlyProgress = {
-      year: currentYear,
-      month: currentMonth,
-      totalSaved: savedThisMonthStr,
-      targetAmount: monthlyTarget.targetAmount.toFixed(2),
-      percentage: mProgress.percentage.toFixed(2),
-      remaining: mProgress.remaining.toFixed(2),
-      isComplete: mProgress.isComplete,
-      hasTarget: true,
-    };
-  } else {
-    monthlyProgress = {
-      year: currentYear,
-      month: currentMonth,
-      totalSaved: savedThisMonthStr,
-      targetAmount: "0.00",
-      percentage: "0.00",
-      remaining: "0.00",
-      isComplete: false,
-      hasTarget: false,
-    };
-  }
+  const savedThisMonth = monthlySaved.toFixed(2);
+  const monthlyProgress = monthlyTarget
+    ? (() => {
+        const progress = calculateMonthlyProgress(monthlySaved, monthlyTarget.targetAmount);
+        return {
+          year: currentYear,
+          month: currentMonth,
+          totalSaved: savedThisMonth,
+          targetAmount: monthlyTarget.targetAmount.toFixed(2),
+          percentage: progress.percentage.toFixed(2),
+          remaining: progress.remaining.toFixed(2),
+          isComplete: progress.isComplete,
+          hasTarget: true,
+        };
+      })()
+    : {
+        year: currentYear,
+        month: currentMonth,
+        totalSaved: savedThisMonth,
+        targetAmount: "0.00",
+        percentage: "0.00",
+        remaining: "0.00",
+        isComplete: false,
+        hasTarget: false,
+      };
 
   return (
-    <div className="space-y-6">
-      <header className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <NexoLogo size={32} className="lg:hidden shrink-0" />
-          <div className="min-w-0">
-            <h1 className="text-xl font-semibold tracking-tight truncate">
-              Buenos días, {firstName}
-            </h1>
-            <p className="text-sm text-muted-foreground truncate">
-              Este mes llevan {formatCurrency(savedThisMonthStr)}
-            </p>
-          </div>
-        </div>
-      </header>
-
-      <Card className="bg-primary text-primary-foreground border-0">
-        <CardContent className="pt-6">
-          <p className="text-sm font-medium opacity-80 uppercase tracking-wide">
-            Nuestro ahorro
-          </p>
-          <p className="text-4xl font-bold tabular-nums mt-1">
-            {formatCurrency(totals.totalAllTime)}
-          </p>
-          <div className="flex items-center gap-2 mt-4 text-sm opacity-90">
-            <span>Este mes: {formatCurrency(savedThisMonthStr)}</span>
-          </div>
-        </CardContent>
-      </Card>
-
-      {monthlyProgress && <MonthlyTargetCard progress={monthlyProgress} />}
-
-      {totals.byUserThisMonth.length > 0 && (
-        <ContributionSummary
-          total={totals.totalThisMonth.toFixed(2)}
-          byUser={totals.byUserThisMonth.map((u) => ({
-            userId: u.userId,
-            name: u.name,
-            total: u.total.toFixed(2),
-          }))}
-        />
-      )}
-
-      <Card>
-        <CardHeader className="pb-3 flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Meta principal</CardTitle>
-          <Link href="/metas" className="text-xs text-primary hover:underline">
-            Ver todas
-          </Link>
-        </CardHeader>
-        <CardContent>
-          {primaryGoal ? (
-            <>
-              <p className="font-medium mb-1">{primaryGoal.name}</p>
-              <div className="flex items-end justify-between mb-2">
-                <span className="text-2xl font-semibold tabular-nums">
-                  {formatCurrency(primaryGoal.currentAmount)}
-                </span>
-                <span className="text-sm text-muted-foreground tabular-nums">
-                  / {formatCurrency(primaryGoal.targetAmount)}
-                </span>
-              </div>
-              <div className="h-2 rounded-full bg-muted overflow-hidden mb-3">
-                <div
-                  className={`h-full rounded-full transition-all ${
-                    primaryGoal.isComplete ? "bg-success" : "bg-secondary"
-                  }`}
-                  style={{
-                    width: `${Math.min(100, Number(primaryGoal.percentage))}%`,
-                  }}
-                />
-              </div>
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span className="tabular-nums">
-                  {Math.min(100, Number(primaryGoal.percentage)).toFixed(0)}%
-                </span>
-                {primaryGoal.isComplete ? (
-                  <span className="text-success font-medium">Meta alcanzada</span>
-                ) : (
-                  <span>Faltan {formatCurrency(primaryGoal.remaining)}</span>
-                )}
-              </div>
-            </>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-6 text-center">
-              <Target className="size-8 text-muted-foreground/40 mb-2" />
-              <p className="text-sm text-muted-foreground">
-                Aún no tienen metas activas
-              </p>
-              <Link
-                href="/metas"
-                className="text-sm text-primary hover:underline mt-1"
-              >
-                Crear su primera meta →
-              </Link>
-            </div>
-          )}
-
-          {goalCounts.active > 0 && (
-            <p className="text-xs text-muted-foreground mt-4 pt-3 border-t border-border">
-              {goalCounts.active}{" "}
-              {goalCounts.active === 1 ? "meta activa" : "metas activas"}
-              {goalCounts.completed > 0 && (
-                <>
-                  {" · "}
-                  {goalCounts.completed}{" "}
-                  {goalCounts.completed === 1 ? "completada" : "completadas"}
-                </>
-              )}
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-3 flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Actividad reciente</CardTitle>
-          <Link
-            href="/actividad"
-            className="text-xs text-primary hover:underline"
-          >
-            Ver todo
-          </Link>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {recent.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              Todavía no hay aportes registrados
-            </p>
-          ) : (
-            recent.map((item) => (
-              <div key={item.id} className="flex items-start gap-3">
-                <div className="size-2 rounded-full bg-primary mt-1.5 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm">
-                    <span className="font-medium">{item.user.name}</span>
-                    {" aportó "}
-                    <span className="font-semibold tabular-nums">
-                      {formatCurrency(item.amount)}
-                    </span>
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {formatDateShort(item.contributionDate)}
-                    {item.goal && ` · ${item.goal.name}`}
-                    {item.note && ` · ${item.note}`}
-                  </p>
-                </div>
-              </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
-
-      <CreateContributionButton className="w-full" goalOptions={goalOptions} />
-    </div>
+    <HomeCockpit
+      greeting={greeting}
+      firstName={firstName}
+      totalAllTime={totals.totalAllTime.toFixed(2)}
+      monthlySaved={savedThisMonth}
+      monthlyProgress={monthlyProgress}
+      activeGoal={primaryGoal}
+      activeGoalsCount={goalCounts.active}
+      completedGoalsCount={goalCounts.completed}
+      goalOptions={goalOptions.map((goal) => ({ id: goal.id, name: goal.name }))}
+      memberTotals={totals.byUserThisMonth.map((member) => ({
+        userId: member.userId,
+        name: member.name,
+        total: member.total.toFixed(2),
+      }))}
+      recentContributions={recent.map((contribution) => ({
+        id: contribution.id,
+        amount: contribution.amount.toFixed(2),
+        contributionDate: contribution.contributionDate.toISOString(),
+        note: contribution.note,
+        user: contribution.user,
+        goal: contribution.goal
+          ? { id: contribution.goal.id, name: contribution.goal.name }
+          : null,
+      }))}
+    />
   );
 }

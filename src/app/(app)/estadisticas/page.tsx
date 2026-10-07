@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,12 +16,7 @@ import {
   calculateGoalCompletion,
   buildMonthlyChartData,
 } from "@/services/stats";
-import { StatsSummary } from "@/features/stats/components/stats-summary";
-import { MonthlyProgressChart } from "@/features/stats/components/monthly-progress-chart";
-import { UserDistributionChart } from "@/features/stats/components/user-distribution-chart";
-import { BestWorstMonths } from "@/features/stats/components/best-worst-months";
-import { CumulativeChart } from "@/features/stats/components/cumulative-chart";
-import { GoalCompletionCard } from "@/features/stats/components/goal-completion-card";
+import { StatsDashboard } from "@/features/stats/components/stats-dashboard";
 import type { StatsData } from "@/features/stats/types";
 import { Prisma } from "@prisma/client";
 
@@ -57,7 +53,7 @@ export default async function EstadisticasPage() {
 
   const coupleId = session.user.coupleId;
 
-  const { contributions, targets, members } = await getStatsData(coupleId);
+  const { contributions, movements, targets, members } = await getStatsData(coupleId);
 
   const hasContributions = contributions.length > 0;
   const hasTargets = targets.length > 0;
@@ -76,13 +72,43 @@ export default async function EstadisticasPage() {
           </p>
         </header>
 
-        <Card>
+        <Card className="border-dashed border-primary/30 bg-primary/5">
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
             <BarChart3 className="size-12 text-muted-foreground/40 mb-4" />
             <p className="font-medium">Aún no hay datos suficientes</p>
             <p className="text-sm text-muted-foreground mt-1 max-w-xs">
               Registren su primer aporte para empezar a ver estadísticas.
             </p>
+
+            <div className="mt-6 grid w-full max-w-xl gap-3 sm:grid-cols-3">
+              <Link
+                href="/actividad"
+                className="rounded-lg border border-border bg-background p-3 text-left transition-colors hover:bg-muted"
+              >
+                <p className="text-sm font-medium">Registrar aporte</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Añade el primer ahorro.
+                </p>
+              </Link>
+              <Link
+                href="/metas"
+                className="rounded-lg border border-border bg-background p-3 text-left transition-colors hover:bg-muted"
+              >
+                <p className="text-sm font-medium">Crear meta</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Define un objetivo real.
+                </p>
+              </Link>
+              <Link
+                href="/perfil"
+                className="rounded-lg border border-border bg-background p-3 text-left transition-colors hover:bg-muted"
+              >
+                <p className="text-sm font-medium">Configurar pareja</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Coordina el ahorro juntos.
+                </p>
+              </Link>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -93,13 +119,13 @@ export default async function EstadisticasPage() {
   // CÁLCULOS
   // ============================================
 
-  const totalAllTime = calculateTotal(contributions);
-  const monthlyAverage = calculateMonthlyAverage(contributions);
-  const activeMonths = countActiveMonths(contributions);
+  const totalAllTime = calculateTotal(movements);
+  const monthlyAverage = calculateMonthlyAverage(movements);
+  const activeMonths = countActiveMonths(movements);
   const contributionsCount = countContributions(contributions);
 
   const byUserMap = aggregateByUser(contributions);
-  const totalForDistribution = totalAllTime;
+  const totalForDistribution = calculateTotal(contributions);
 
   const userDistribution = members.map((m) => {
     const userTotal = byUserMap.get(m.userId) ?? new Prisma.Decimal(0);
@@ -115,12 +141,12 @@ export default async function EstadisticasPage() {
     };
   });
 
-  const { best, worst } = findBestAndWorstMonths(contributions);
+  const { best, worst } = findBestAndWorstMonths(movements);
 
-  const cumulative = calculateCumulative(contributions);
+  const cumulative = calculateCumulative(movements);
 
   const goalCompletion = calculateGoalCompletion(
-    contributions,
+    movements,
     targets.map((t) => ({
       year: t.year,
       month: t.month,
@@ -129,18 +155,32 @@ export default async function EstadisticasPage() {
   );
 
   const monthlyChart = buildMonthlyChartData(
-    contributions,
+    movements,
     targets.map((t) => ({
       year: t.year,
       month: t.month,
       targetAmount: t.targetAmount,
     })),
-    6
+    120
   );
 
   // ============================================
   // SERIALIZACIÓN
   // ============================================
+
+  const bestMonthLabel = best
+    ? `${best.month.toString().padStart(2, "0")}/${best.year}`
+    : null;
+
+  const consistencyScore = Math.min(
+    100,
+    Math.round((Math.min(activeMonths, 12) / 12) * 100)
+  );
+
+  const recommendation =
+    consistencyScore >= 70
+      ? "Mantienen un patrón de ahorro muy constante. Sigan aportando en la misma frecuencia para sostener el crecimiento."
+      : "El hábito de ahorro aún es irregular. Un aporte semanal fijo puede ayudar a mantener la constancia y evitar picos de esfuerzo.";
 
   const statsData: StatsData = {
     summary: {
@@ -148,6 +188,12 @@ export default async function EstadisticasPage() {
       monthlyAverage: monthlyAverage.toFixed(2),
       activeMonths,
       contributionsCount,
+    },
+    habitSummary: {
+      bestMonthLabel: bestMonthLabel,
+      averageMonthlyContribution: monthlyAverage.toFixed(2),
+      consistencyScore,
+      recommendation,
     },
     monthlyChart: monthlyChart.map((p) => ({
       key: p.key,
@@ -189,33 +235,7 @@ export default async function EstadisticasPage() {
     hasTargets,
   };
 
-  // ============================================
-  // RENDER
-  // ============================================
-
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Estadísticas</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Análisis de su progreso compartido
-        </p>
-      </header>
-
-      <StatsSummary summary={statsData.summary} />
-
-      <GoalCompletionCard completion={statsData.goalCompletion} />
-
-      <MonthlyProgressChart data={statsData.monthlyChart} />
-
-      <BestWorstMonths
-        best={statsData.bestMonth}
-        worst={statsData.worstMonth}
-      />
-
-      <UserDistributionChart distribution={statsData.userDistribution} />
-
-      <CumulativeChart data={statsData.cumulative} />
-    </div>
+    <StatsDashboard data={statsData} />
   );
 }

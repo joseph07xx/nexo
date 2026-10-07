@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Calendar } from "lucide-react";
+import { APP_TIMEZONE } from "@/utils/format-currency";
 
 interface CoupleInfoCardProps {
   currentUserName: string;
@@ -9,6 +10,7 @@ interface CoupleInfoCardProps {
 
 function formatDate(date: Date): string {
   return new Intl.DateTimeFormat("es-HN", {
+    timeZone: APP_TIMEZONE,
     day: "numeric",
     month: "long",
     year: "numeric",

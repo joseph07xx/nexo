@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
 
 // ============================================
 // CONSULTAS
@@ -23,6 +22,19 @@ export async function getContributionsForStats(coupleId: string) {
     orderBy: {
       contributionDate: "asc",
     },
+  });
+}
+
+export async function getWithdrawalsForStats(coupleId: string) {
+  return prisma.savingsWithdrawal.findMany({
+    where: { coupleId },
+    select: {
+      id: true,
+      userId: true,
+      amount: true,
+      withdrawalDate: true,
+    },
+    orderBy: { withdrawalDate: "asc" },
   });
 }
 
@@ -64,14 +76,24 @@ export async function getCoupleMembers(coupleId: string) {
  * Ejecuta las queries en paralelo.
  */
 export async function getStatsData(coupleId: string) {
-  const [contributions, targets, members] = await Promise.all([
+  const [contributions, withdrawals, targets, members] = await Promise.all([
     getContributionsForStats(coupleId),
+    getWithdrawalsForStats(coupleId),
     getMonthlyTargetsForStats(coupleId),
     getCoupleMembers(coupleId),
   ]);
 
   return {
     contributions,
+    movements: [
+      ...contributions,
+      ...withdrawals.map((withdrawal) => ({
+        ...withdrawal,
+        amount: withdrawal.amount.negated(),
+        contributionDate: withdrawal.withdrawalDate,
+        kind: "WITHDRAWAL" as const,
+      })),
+    ].sort((first, second) => first.contributionDate.getTime() - second.contributionDate.getTime()),
     targets,
     members,
   };

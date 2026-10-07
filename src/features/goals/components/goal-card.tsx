@@ -24,13 +24,18 @@ export function GoalCard({
   const isArchived = goal.status === "ARCHIVED";
 
   return (
-    <Card>
+    <Card className="overflow-hidden border border-border/80 bg-card/90 shadow-sm transition-shadow hover:shadow-md">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
+            <div className="mb-2 flex items-center gap-2">
+              <span className="inline-flex rounded-full bg-primary/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
+                {isActive ? "Activa" : isArchived ? "Archivada" : "Meta"}
+              </span>
+            </div>
             <Link
               href={`/metas/${goal.id}`}
-              className="text-base font-semibold tracking-tight hover:underline line-clamp-1"
+              className="text-base font-semibold tracking-tight text-foreground hover:text-primary transition-colors line-clamp-1"
             >
               {goal.name}
             </Link>
@@ -62,7 +67,7 @@ export function GoalCard({
         />
 
         {goal.targetDate && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground border-t border-border pt-3">
             <Calendar className="size-3.5" />
             <span>Objetivo: {formatDateLong(new Date(goal.targetDate))}</span>
           </div>

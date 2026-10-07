@@ -18,8 +18,8 @@ export function NexoLogo({ className, size = 32 }: NexoLogoProps) {
     >
       <defs>
         <linearGradient id="nexo-gradient" x1="4" y1="4" x2="28" y2="28" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="oklch(0.42 0.12 250)" />
-          <stop offset="100%" stopColor="oklch(0.72 0.14 190)" />
+          <stop offset="0%" stopColor="var(--color-primary)" />
+          <stop offset="100%" stopColor="var(--color-secondary)" />
         </linearGradient>
       </defs>
       

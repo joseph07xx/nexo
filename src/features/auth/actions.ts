@@ -5,6 +5,12 @@ import { prisma } from "@/lib/prisma";
 import { registerSchema } from "@/schemas/auth";
 import { signIn } from "@/auth";
 import { AuthError } from "next-auth";
+import { headers } from "next/headers";
+import {
+  consumeAuthAttempt,
+  getClientIpFromHeaders,
+  getRegistrationRateLimitRule,
+} from "@/services/auth-rate-limit";
 
 export type RegisterState = {
   success?: boolean;
@@ -32,6 +38,17 @@ export async function registerUser(
   }
 
   const { name, email, password } = parsed.data;
+
+  const requestHeaders = await headers();
+  const registrationAllowed = await consumeAuthAttempt(
+    getRegistrationRateLimitRule(getClientIpFromHeaders(requestHeaders))
+  );
+
+  if (!registrationAllowed) {
+    return {
+      error: "Demasiados intentos de registro. Espera un momento antes de volver a intentar.",
+    };
+  }
 
   try {
     const existing = await prisma.user.findUnique({

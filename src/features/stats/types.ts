@@ -12,6 +12,13 @@ export interface StatsSummary {
   contributionsCount: number;
 }
 
+export interface HabitSummary {
+  bestMonthLabel: string | null;
+  averageMonthlyContribution: string;
+  consistencyScore: number;
+  recommendation: string;
+}
+
 export interface MonthlyChartPointSerializable {
   key: string;
   year: number;
@@ -50,6 +57,7 @@ export interface GoalCompletionSerializable {
 
 export interface StatsData {
   summary: StatsSummary;
+  habitSummary?: HabitSummary;
   monthlyChart: MonthlyChartPointSerializable[];
   userDistribution: UserDistributionItem[];
   bestMonth: BestWorstMonthSerializable | null;

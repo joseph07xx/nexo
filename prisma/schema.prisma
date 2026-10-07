@@ -21,6 +21,11 @@ enum SavingsGoalStatus {
   ARCHIVED
 }
 
+enum NotificationType {
+  CONTRIBUTION_CREATED
+  WITHDRAWAL_CREATED
+}
+
 // ============================================
 // USUARIO (Auth.js + NEXO)
 // ============================================
@@ -43,6 +48,9 @@ model User {
   coupleMember    CoupleMember?
   invitationsSent CoupleInvitation[]
   contributions   SavingsContribution[]
+  withdrawals     SavingsWithdrawal[]
+  notificationsReceived InAppNotification[] @relation("NotificationRecipient")
+  notificationsSent     InAppNotification[] @relation("NotificationActor")
 }
 
 // ============================================
@@ -58,6 +66,7 @@ model Couple {
   members       CoupleMember[]
   invitations   CoupleInvitation[]
   contributions SavingsContribution[]
+  withdrawals   SavingsWithdrawal[]
   goals         SavingsGoal[]
   monthlyTargets MonthlyTarget[]
 
@@ -119,10 +128,61 @@ model SavingsContribution {
   couple Couple       @relation(fields: [coupleId], references: [id], onDelete: Cascade)
   user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   goal   SavingsGoal? @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  notifications InAppNotification[]
 
   @@index([coupleId, contributionDate])
   @@index([userId])
   @@index([goalId])
+}
+
+model SavingsWithdrawal {
+  id             String   @id @default(cuid())
+  coupleId       String
+  userId         String
+  goalId         String?
+  amount         Decimal  @db.Decimal(14, 2)
+  note           String?  @db.VarChar(280)
+  withdrawalDate DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  couple Couple       @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goal   SavingsGoal? @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  notifications InAppNotification[]
+
+  @@index([coupleId, withdrawalDate])
+  @@index([userId])
+  @@index([goalId])
+}
+
+model InAppNotification {
+  id             String           @id @default(cuid())
+  recipientId    String
+  actorId        String
+  contributionId String?
+  withdrawalId   String?
+  type           NotificationType @default(CONTRIBUTION_CREATED)
+  readAt         DateTime?
+  createdAt      DateTime         @default(now())
+
+  recipient    User                @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  actor        User                @relation("NotificationActor", fields: [actorId], references: [id], onDelete: Cascade)
+  contribution SavingsContribution? @relation(fields: [contributionId], references: [id], onDelete: Cascade)
+  withdrawal   SavingsWithdrawal?   @relation(fields: [withdrawalId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId, readAt, createdAt])
+  @@index([withdrawalId])
+}
+
+model AuthRateLimit {
+  id             String   @id @default(cuid())
+  keyHash        String   @unique @db.Char(64)
+  attempts       Int      @default(0)
+  windowStartedAt DateTime @default(now())
+  blockedUntil   DateTime?
+  updatedAt      DateTime @updatedAt
+
+  @@index([updatedAt])
 }
 
 // ============================================
@@ -144,6 +204,7 @@ model SavingsGoal {
 
   couple        Couple                @relation(fields: [coupleId], references: [id], onDelete: Cascade)
   contributions SavingsContribution[]
+  withdrawals   SavingsWithdrawal[]
 
   @@index([coupleId, status])
   @@index([coupleId, createdAt])

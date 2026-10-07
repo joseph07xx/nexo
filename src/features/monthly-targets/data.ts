@@ -41,20 +41,25 @@ export async function getMonthlySavedTotal(
 ): Promise<Prisma.Decimal> {
   const { start, end } = getMonthRange(year, month);
 
-  const result = await prisma.savingsContribution.aggregate({
-    where: {
-      coupleId,
-      contributionDate: {
-        gte: start,
-        lte: end,
+  const [contributions, withdrawals] = await Promise.all([
+    prisma.savingsContribution.aggregate({
+      where: {
+        coupleId,
+        contributionDate: { gte: start, lte: end },
       },
-    },
-    _sum: {
-      amount: true,
-    },
-  });
+      _sum: { amount: true },
+    }),
+    prisma.savingsWithdrawal.aggregate({
+      where: {
+        coupleId,
+        withdrawalDate: { gte: start, lte: end },
+      },
+      _sum: { amount: true },
+    }),
+  ]);
 
-  return result._sum.amount ?? new Prisma.Decimal(0);
+  return (contributions._sum.amount ?? new Prisma.Decimal(0))
+    .minus(withdrawals._sum.amount ?? new Prisma.Decimal(0));
 }
 
 // ============================================

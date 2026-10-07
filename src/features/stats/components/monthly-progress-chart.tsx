@@ -68,7 +68,7 @@ export function MonthlyProgressChart({
             >
               <CartesianGrid
                 strokeDasharray="3 3"
-                stroke="oklch(0.90 0.005 90)"
+                stroke="var(--color-border)"
                 vertical={false}
               />
 
@@ -76,7 +76,7 @@ export function MonthlyProgressChart({
                 dataKey="label"
                 tick={{
                   fontSize: 11,
-                  fill: "oklch(0.52 0.01 260)",
+                  fill: "var(--color-muted-foreground)",
                 }}
                 axisLine={false}
                 tickLine={false}
@@ -85,7 +85,7 @@ export function MonthlyProgressChart({
               <YAxis
                 tick={{
                   fontSize: 11,
-                  fill: "oklch(0.52 0.01 260)",
+                  fill: "var(--color-muted-foreground)",
                 }}
                 axisLine={false}
                 tickLine={false}
@@ -113,25 +113,25 @@ export function MonthlyProgressChart({
                   fontSize: 12,
                   borderRadius: 8,
                   border:
-                    "1px solid oklch(0.90 0.005 90)",
+                    "1px solid var(--color-border)",
                 }}
               />
 
               <Bar
                 dataKey="ahorro"
-                fill="oklch(0.42 0.12 250)"
+                fill="var(--color-primary)"
                 radius={[6, 6, 0, 0]}
                 maxBarSize={40}
               />
 
               <Line
                 dataKey="objetivo"
-                stroke="oklch(0.72 0.14 190)"
+                stroke="var(--color-secondary)"
                 strokeWidth={2}
                 strokeDasharray="4 4"
                 dot={{
                   r: 3,
-                  fill: "oklch(0.72 0.14 190)",
+                  fill: "var(--color-secondary)",
                 }}
                 connectNulls={false}
                 type="monotone"

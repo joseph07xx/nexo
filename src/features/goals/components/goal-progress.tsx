@@ -21,37 +21,39 @@ export function GoalProgress({
   const displayPercentage = Math.min(100, numericPercentage);
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <div className="flex items-end justify-between gap-2">
         <span
           className={
             variant === "full"
-              ? "text-3xl font-bold tabular-nums"
-              : "text-2xl font-semibold tabular-nums"
+              ? "text-3xl font-bold tabular-nums tracking-tight"
+              : "text-2xl font-semibold tabular-nums tracking-tight"
           }
         >
           {formatCurrency(currentAmount)}
         </span>
-        <span className="text-sm text-muted-foreground tabular-nums">
+        <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium text-muted-foreground tabular-nums">
           / {formatCurrency(targetAmount)}
         </span>
       </div>
 
-      <div className="h-2 rounded-full bg-muted overflow-hidden">
+      <div className="overflow-hidden rounded-full bg-muted/80">
         <div
-          className={`h-full rounded-full transition-all ${
-            isComplete ? "bg-success" : "bg-primary"
+          className={`h-2.5 rounded-full transition-all ${
+            isComplete ? "bg-success" : "bg-gradient-to-r from-primary to-primary/80"
           }`}
           style={{ width: `${displayPercentage}%` }}
         />
       </div>
 
       <div className="flex items-center justify-between text-xs">
-        <span className="text-muted-foreground tabular-nums">
+        <span className="inline-flex rounded-full bg-primary/10 px-2 py-1 font-medium text-primary tabular-nums">
           {displayPercentage.toFixed(0)}%
         </span>
         {isComplete ? (
-          <span className="text-success font-medium">Meta alcanzada</span>
+          <span className="rounded-full bg-success/10 px-2 py-1 font-medium text-success">
+            Meta alcanzada
+          </span>
         ) : (
           <span className="text-muted-foreground tabular-nums">
             Faltan {formatCurrency(remaining)}

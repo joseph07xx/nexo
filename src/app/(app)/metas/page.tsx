@@ -6,9 +6,7 @@ import { NoCoupleEmptyState } from "@/components/layout/no-couple-empty-state";
 import { getGoalsWithProgress } from "@/features/goals/data";
 import { calculateGoalProgress } from "@/services/goals";
 import { serializeGoal } from "@/features/goals/types";
-import { CreateGoalButton } from "@/features/goals/components/create-goal-button";
-import { GoalsList } from "@/features/goals/components/goals-list";
-import { CompletedGoalsSection } from "@/features/goals/components/completed-goals-section";
+import { GoalsWorkspace } from "@/features/goals/components/goals-workspace";
 
 export default async function MetasPage() {
   const session = await auth();
@@ -96,23 +94,10 @@ export default async function MetasPage() {
   });
 
   return (
-    <div className="space-y-6">
-      <header className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Metas</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Sus objetivos de ahorro compartidos
-          </p>
-        </div>
-        <CreateGoalButton size="default" label="Nueva meta" />
-      </header>
-
-      <GoalsList goals={activeSerialized} />
-
-      <CompletedGoalsSection
-        completed={completedSerialized}
-        archived={archivedSerialized}
-      />
-    </div>
+    <GoalsWorkspace
+      active={activeSerialized}
+      completed={completedSerialized}
+      archived={archivedSerialized}
+    />
   );
 }

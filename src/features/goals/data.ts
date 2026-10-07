@@ -82,14 +82,24 @@ export async function getGoalsWithProgress(
 
   const goalIds = goals.map((g) => g.id);
 
-  const totals = await prisma.savingsContribution.groupBy({
-    by: ["goalId"],
-    where: {
-      coupleId,
-      goalId: { in: goalIds },
-    },
-    _sum: { amount: true },
-  });
+  const [totals, withdrawals] = await Promise.all([
+    prisma.savingsContribution.groupBy({
+      by: ["goalId"],
+      where: {
+        coupleId,
+        goalId: { in: goalIds },
+      },
+      _sum: { amount: true },
+    }),
+    prisma.savingsWithdrawal.groupBy({
+      by: ["goalId"],
+      where: {
+        coupleId,
+        goalId: { in: goalIds },
+      },
+      _sum: { amount: true },
+    }),
+  ]);
 
   const totalMap = new Map<string, Prisma.Decimal>();
   for (const t of totals) {
@@ -98,9 +108,17 @@ export async function getGoalsWithProgress(
     }
   }
 
+  const withdrawalMap = new Map<string, Prisma.Decimal>();
+  for (const withdrawal of withdrawals) {
+    if (withdrawal.goalId && withdrawal._sum.amount) {
+      withdrawalMap.set(withdrawal.goalId, withdrawal._sum.amount);
+    }
+  }
+
   return goals.map((goal) => ({
     goal,
-    currentAmount: totalMap.get(goal.id) ?? new Prisma.Decimal(0),
+    currentAmount: (totalMap.get(goal.id) ?? new Prisma.Decimal(0))
+      .minus(withdrawalMap.get(goal.id) ?? new Prisma.Decimal(0)),
   }));
 }
 
@@ -114,14 +132,21 @@ export async function getGoalWithProgress(id: string) {
 
   if (!goal) return null;
 
-  const totals = await prisma.savingsContribution.aggregate({
-    where: { goalId: id },
-    _sum: { amount: true },
-  });
+  const [contributions, withdrawals] = await Promise.all([
+    prisma.savingsContribution.aggregate({
+      where: { goalId: id },
+      _sum: { amount: true },
+    }),
+    prisma.savingsWithdrawal.aggregate({
+      where: { goalId: id },
+      _sum: { amount: true },
+    }),
+  ]);
 
   return {
     goal,
-    currentAmount: totals._sum.amount ?? new Prisma.Decimal(0),
+    currentAmount: (contributions._sum.amount ?? new Prisma.Decimal(0))
+      .minus(withdrawals._sum.amount ?? new Prisma.Decimal(0)),
   };
 }
 
@@ -151,14 +176,21 @@ export async function getPrimaryGoalWithProgress(coupleId: string) {
 
   if (!goal) return null;
 
-  const totals = await prisma.savingsContribution.aggregate({
-    where: { goalId: goal.id },
-    _sum: { amount: true },
-  });
+  const [contributions, withdrawals] = await Promise.all([
+    prisma.savingsContribution.aggregate({
+      where: { goalId: goal.id },
+      _sum: { amount: true },
+    }),
+    prisma.savingsWithdrawal.aggregate({
+      where: { goalId: goal.id },
+      _sum: { amount: true },
+    }),
+  ]);
 
   return {
     goal,
-    currentAmount: totals._sum.amount ?? new Prisma.Decimal(0),
+    currentAmount: (contributions._sum.amount ?? new Prisma.Decimal(0))
+      .minus(withdrawals._sum.amount ?? new Prisma.Decimal(0)),
   };
 }
 
@@ -293,12 +325,19 @@ export async function reconcileGoalStatus(
   // Una meta archivada no se reactiva automáticamente
   if (goal.status === "ARCHIVED") return;
 
-  const totals = await tx.savingsContribution.aggregate({
-    where: { goalId },
-    _sum: { amount: true },
-  });
+  const [contributions, withdrawals] = await Promise.all([
+    tx.savingsContribution.aggregate({
+      where: { goalId },
+      _sum: { amount: true },
+    }),
+    tx.savingsWithdrawal.aggregate({
+      where: { goalId },
+      _sum: { amount: true },
+    }),
+  ]);
 
-  const current = totals._sum.amount ?? new Prisma.Decimal(0);
+  const current = (contributions._sum.amount ?? new Prisma.Decimal(0))
+    .minus(withdrawals._sum.amount ?? new Prisma.Decimal(0));
   const isComplete = current.greaterThanOrEqualTo(goal.targetAmount);
 
   if (isComplete && goal.status === "ACTIVE") {

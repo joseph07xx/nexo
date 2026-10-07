@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { CoupleInfoCard } from "./couple-info-card";
 import { CreateCoupleCard } from "./create-couple-card";
 import { InvitationCard } from "./invitation-card";
@@ -8,6 +8,7 @@ import { JoinCoupleDialog } from "./join-couple-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RefreshCw } from "lucide-react";
+import { regenerateInvitationAction } from "../actions";
 
 export type CoupleInitialState =
   | { kind: "no-couple" }
@@ -60,7 +61,11 @@ export function CoupleProfileClient({ initialState }: CoupleProfileClientProps) 
           <p className="text-sm text-muted-foreground">
             No tienes una invitación activa. Genera una nueva para invitar a tu pareja.
           </p>
-          <RegenerateButton />
+          <RegenerateButton
+            onSuccess={({ code, expiresAt }) => {
+              setState({ kind: "owner-with-invitation", code, expiresAt });
+            }}
+          />
         </CardContent>
       </Card>
     );
@@ -70,11 +75,11 @@ export function CoupleProfileClient({ initialState }: CoupleProfileClientProps) 
   return (
     <>
       <CreateCoupleCard
-        onCreateSuccess={(code) => {
+        onCreateSuccess={({ code, expiresAt }) => {
           setState({
             kind: "owner-with-invitation",
             code,
-            expiresAt: getFutureDate(7),
+            expiresAt,
           });
         }}
         onJoinClick={() => setJoinDialogOpen(true)}
@@ -88,18 +93,26 @@ export function CoupleProfileClient({ initialState }: CoupleProfileClientProps) 
   );
 }
 
-function getFutureDate(days: number): string {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  return date.toISOString();
-}
+function RegenerateButton({ onSuccess }: { onSuccess: (data: { code: string; expiresAt: string }) => void }) {
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
-// Placeholder — se reemplaza con el mismo botón de regeneración
-function RegenerateButton() {
+  function handleRegenerate() {
+    setError(null);
+    startTransition(async () => {
+      const result = await regenerateInvitationAction();
+      if (result.success) onSuccess(result.data);
+      else setError(result.error);
+    });
+  }
+
   return (
-    <Button variant="outline" className="w-full" disabled>
-      <RefreshCw className="size-4 mr-2" />
-      Regenerar código (próximamente)
-    </Button>
+    <div className="space-y-3">
+      {error && <p className="text-xs text-destructive">{error}</p>}
+      <Button variant="outline" className="w-full" disabled={isPending} onClick={handleRegenerate}>
+        <RefreshCw className="mr-2 size-4" />
+        {isPending ? "Generando..." : "Generar invitación"}
+      </Button>
+    </div>
   );
 }

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Copy, Check, RefreshCw, Clock } from "lucide-react";
 import { regenerateInvitationAction } from "../actions";
+import { APP_TIMEZONE } from "@/utils/format-currency";
 
 interface InvitationCardProps {
   code: string;
@@ -13,6 +14,7 @@ interface InvitationCardProps {
 
 function formatDate(date: Date): string {
   return new Intl.DateTimeFormat("es-HN", {
+    timeZone: APP_TIMEZONE,
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -42,9 +44,7 @@ export function InvitationCard({ code, expiresAt }: InvitationCardProps) {
       const result = await regenerateInvitationAction();
       if (result.success) {
         setCurrentCode(result.data.code);
-        const newExpiration = new Date();
-        newExpiration.setDate(newExpiration.getDate() + 7);
-        setCurrentExpiresAt(newExpiration);
+        setCurrentExpiresAt(new Date(result.data.expiresAt));
       } else {
         setError(result.error);
       }

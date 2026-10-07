@@ -5,14 +5,14 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import {
   createContributionSchema,
-  updateContributionSchema,
+  createWithdrawalSchema,
 } from "@/schemas/contribution";
 import { isValidContributionDate } from "@/services/contributions";
 import {
   createContribution,
+  createWithdrawalWithBalanceCheck,
   deleteContribution,
   getContributionById,
-  updateContribution,
 } from "./data";
 import { serializeContribution } from "./types";
 
@@ -167,7 +167,7 @@ export async function createContributionAction(
       amount,
       contributionDate,
       note,
-      goalId,
+      goalId: goalId ?? null,
     });
 
     revalidatePath("/inicio");
@@ -187,66 +187,18 @@ export async function createContributionAction(
   }
 }
 
-// ============================================
-// ACTUALIZAR APORTE
-// ============================================
-
-export async function updateContributionAction(
-  id: string,
-  prevState: ContributionActionResult | null,
+export async function createWithdrawalAction(
+  _prevState: ContributionActionResult | null,
   formData: FormData
 ): Promise<ContributionActionResult> {
   const auth = await getAuthenticatedCouple();
 
   if (!auth) {
-    return {
-      success: false,
-      error: "No autenticado o sin pareja",
-    };
+    return { success: false, error: "No autenticado o sin pareja" };
   }
 
-  // ============================================
-  // BUSCAR APORTE EXISTENTE
-  // ============================================
-
-  const existing = await getContributionById(id);
-
-  if (!existing) {
-    return {
-      success: false,
-      error: "Aporte no encontrado",
-    };
-  }
-
-  // ============================================
-  // VALIDAR PERTENENCIA A LA PAREJA
-  // ============================================
-
-  if (existing.coupleId !== auth.coupleId) {
-    return {
-      success: false,
-      error: "Aporte no encontrado",
-    };
-  }
-
-  // ============================================
-  // VALIDAR PROPIETARIO
-  // ============================================
-
-  if (existing.userId !== auth.userId) {
-    return {
-      success: false,
-      error: "Solo puedes editar tus propios aportes",
-    };
-  }
-
-  // ============================================
-  // VALIDAR DATOS
-  // ============================================
-
-  const parsed = updateContributionSchema.safeParse({
+  const parsed = createWithdrawalSchema.safeParse({
     amount: formData.get("amount"),
-    contributionDate: formData.get("contributionDate"),
     note: formData.get("note"),
     goalId: formData.get("goalId") || null,
   });
@@ -259,111 +211,51 @@ export async function updateContributionAction(
     };
   }
 
-  const { amount, contributionDate, note, goalId } = parsed.data;
-
-  // ============================================
-  // VALIDAR FECHA
-  // ============================================
-
-  const coupleCreatedAt = await getCoupleCreatedAt(auth.coupleId);
-
-  if (!coupleCreatedAt) {
-    return {
-      success: false,
-      error: "Pareja no encontrada",
-    };
-  }
-
-  const dateCheck = isValidContributionDate(
-    contributionDate,
-    coupleCreatedAt
-  );
-
-  if (!dateCheck.valid) {
-    const messages: Record<typeof dateCheck.reason, string> = {
-      FUTURE: "La fecha no puede ser futura",
-      BEFORE_COUPLE:
-        "La fecha no puede ser anterior a la creación de la pareja",
-    };
-
-    return {
-      success: false,
-      error: "Fecha inválida",
-      fieldErrors: {
-        contributionDate: [messages[dateCheck.reason]],
-      },
-    };
-  }
-
-  // ============================================
-  // VALIDAR META
-  // ============================================
+  const { amount, note, goalId } = parsed.data;
 
   if (goalId) {
     const goal = await prisma.savingsGoal.findUnique({
-      where: {
-        id: goalId,
-      },
-      select: {
-        coupleId: true,
-        status: true,
-      },
+      where: { id: goalId },
+      select: { coupleId: true },
     });
 
     if (!goal || goal.coupleId !== auth.coupleId) {
-      return {
-        success: false,
-        error: "Meta inválida",
-      };
-    }
-
-    if (goal.status !== "ACTIVE") {
-      return {
-        success: false,
-        error: "Solo se pueden asociar aportes a metas activas",
-      };
+      return { success: false, error: "La meta seleccionada no es válida" };
     }
   }
 
-  // ============================================
-  // ACTUALIZAR APORTE
-  // ============================================
-
   try {
-    const updated = await updateContribution({
-      id,
+    await createWithdrawalWithBalanceCheck({
+      coupleId: auth.coupleId,
+      userId: auth.userId,
+      goalId: goalId ?? null,
       amount,
-      contributionDate,
       note,
-      goalId,
     });
-
-    // Volvemos a obtener el aporte incluyendo usuario y meta.
-    const updatedWithRelations = await getContributionById(id);
-
-    if (!updatedWithRelations) {
-      return {
-        success: false,
-        error: "No se pudo recuperar el aporte actualizado",
-      };
-    }
 
     revalidatePath("/inicio");
     revalidatePath("/actividad");
+    revalidatePath("/estadisticas");
+    revalidatePath("/metas");
+    if (goalId) revalidatePath(`/metas/${goalId}`);
 
-    return {
-      success: true,
-      data: serializeContribution(updatedWithRelations),
-    };
+    return { success: true, data: undefined };
   } catch (error) {
-    console.error("Error al actualizar aporte:", error);
+    if (error instanceof Error && error.message === "INSUFFICIENT_WITHDRAWAL_BALANCE") {
+      return {
+        success: false,
+        error: "El retiro supera el saldo disponible de ese origen. Actualiza el saldo e inténtalo de nuevo.",
+      };
+    }
 
-    return {
-      success: false,
-      error: "No se pudo actualizar el aporte",
-    };
+    console.error("Error al registrar retiro:", error);
+    return { success: false, error: "No se pudo registrar el retiro" };
   }
 }
+
+// ============================================
+// ELIMINAR APORTE
+// ============================================
 
 // ============================================
 // ELIMINAR APORTE
@@ -431,6 +323,13 @@ export async function deleteContributionAction(
       data: undefined,
     };
   } catch (error) {
+    if (error instanceof Error && error.message === "CONTRIBUTION_HAS_WITHDRAWALS") {
+      return {
+        success: false,
+        error: "No se puede eliminar: ya se retiró parte del saldo de este origen.",
+      };
+    }
+
     console.error("Error al eliminar aporte:", error);
 
     return {

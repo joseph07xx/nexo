@@ -40,6 +40,35 @@
   --radius: 0.75rem;
 }
 
+:root {
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
+  --color-background: oklch(0.16 0.015 260);
+  --color-foreground: oklch(0.94 0.008 90);
+  --color-card: oklch(0.22 0.018 260);
+  --color-card-foreground: oklch(0.94 0.008 90);
+  --color-primary: oklch(0.66 0.13 250);
+  --color-primary-foreground: oklch(0.99 0.002 90);
+  --color-secondary: oklch(0.68 0.13 190);
+  --color-secondary-foreground: oklch(0.17 0.012 260);
+  --color-muted: oklch(0.27 0.018 260);
+  --color-muted-foreground: oklch(0.73 0.012 260);
+  --color-accent: oklch(0.31 0.025 250);
+  --color-accent-foreground: oklch(0.94 0.008 90);
+  --color-destructive: oklch(0.69 0.17 25);
+  --color-destructive-foreground: oklch(0.16 0.015 260);
+  --color-success: oklch(0.74 0.15 155);
+  --color-success-foreground: oklch(0.16 0.015 260);
+  --color-warning: oklch(0.81 0.14 75);
+  --color-warning-foreground: oklch(0.17 0.02 65);
+  --color-border: oklch(0.34 0.014 260);
+  --color-input: oklch(0.3 0.016 260);
+  --color-ring: oklch(0.72 0.12 245);
+}
+
 @layer base {
   * {
     @apply border-border;
@@ -49,6 +78,7 @@
     @apply bg-background text-foreground;
     font-feature-settings: "cv11", "ss01";
     font-variation-settings: "opsz" 32;
+    transition: background-color 180ms ease, color 180ms ease;
   }
   
   /* Tabular nums for financial data */

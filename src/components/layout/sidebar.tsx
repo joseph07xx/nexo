@@ -1,18 +1,18 @@
 import Link from "next/link";
-import { auth, signOut } from "@/auth";
-import { cn } from "@/lib/utils";
+import { signOut } from "@/auth";
 import { NexoLogo } from "@/components/brand/nexo-logo";
 import { navItems } from "./nav-items";
 import { LogOut } from "lucide-react";
 
 interface SidebarProps {
+  unreadNotificationCount: number;
   user: {
     name?: string | null;
     email?: string | null;
   };
 }
 
-export function Sidebar({ user }: SidebarProps) {
+export function Sidebar({ user, unreadNotificationCount }: SidebarProps) {
   // Nota: usePathname requiere Client Component. Movemos la parte activa a un subcomponente.
   return (
     <aside className="hidden lg:flex lg:flex-col lg:w-60 lg:fixed lg:inset-y-0 lg:border-r lg:border-border lg:bg-card">
@@ -30,6 +30,11 @@ export function Sidebar({ user }: SidebarProps) {
           >
             <item.icon className="size-5" />
             <span>{item.label}</span>
+            {item.href === "/actividad" && unreadNotificationCount > 0 && (
+              <span className="ml-auto min-w-5 rounded-full bg-primary px-1.5 py-0.5 text-center text-[10px] font-bold leading-4 text-primary-foreground">
+                {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
+              </span>
+            )}
           </Link>
         ))}
       </nav>

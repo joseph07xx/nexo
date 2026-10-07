@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { getIsoDateInAppTimezone } from "@/utils/format-currency";
 import type { ContributionActionResult } from "../actions";
 
 export interface ContributionFormValues {
@@ -62,7 +63,7 @@ export function ContributionForm({
     FormData
   >(action, null);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getIsoDateInAppTimezone();
 
   const [amount, setAmount] = useState(initialValues?.amount ?? "");
   const [contributionDate, setContributionDate] = useState(
@@ -70,6 +71,7 @@ export function ContributionForm({
   );
   const [note, setNote] = useState(initialValues?.note ?? "");
   const [goalId, setGoalId] = useState(initialValues?.goalId ?? "");
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const fieldErrors =
     state?.success === false ? state.fieldErrors : undefined;
@@ -80,10 +82,32 @@ export function ContributionForm({
     if (state?.success && onSuccess) {
       onSuccess();
     }
-  }, [state?.success, onSuccess]);
+
+    if (state?.success && "data" in state && state.data) {
+      const contribution = state.data as {
+        user?: { name?: string };
+        amount?: string;
+      };
+
+      const name = contribution.user?.name ?? "Un miembro";
+      const amountValue = contribution.amount ?? "0.00";
+
+      setToastMessage(`NEXO: ${name} ha realizado un aporte de L ${amountValue}.`);
+
+      const timer = window.setTimeout(() => setToastMessage(null), 4000);
+      return () => window.clearTimeout(timer);
+    }
+  }, [state, onSuccess]);
 
   return (
-    <form action={formAction} className="space-y-4">
+    <>
+      {toastMessage && (
+        <div className="mb-4 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm font-medium text-foreground shadow-sm">
+          {toastMessage}
+        </div>
+      )}
+
+      <form action={formAction} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="amount">Cantidad (L)</Label>
 
@@ -182,23 +206,24 @@ export function ContributionForm({
         </div>
       )}
 
-      <div className="flex gap-2 pt-2">
-        {onCancel && (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onCancel}
-            className="flex-1"
-          >
-            Cancelar
-          </Button>
-        )}
+        <div className="flex gap-2 pt-2">
+          {onCancel && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onCancel}
+              className="flex-1"
+            >
+              Cancelar
+            </Button>
+          )}
 
-        <SubmitButton
-          label={submitLabel}
-          pendingLabel={pendingLabel}
-        />
-      </div>
-    </form>
+          <SubmitButton
+            label={submitLabel}
+            pendingLabel={pendingLabel}
+          />
+        </div>
+      </form>
+    </>
   );
 }

@@ -18,6 +18,7 @@ export interface ContributionLike {
   amount: Prisma.Decimal;
   userId: string;
   contributionDate: Date;
+  kind?: "CONTRIBUTION" | "WITHDRAWAL";
 }
 
 export interface MonthlyTargetLike {
@@ -154,7 +155,7 @@ export function calculateTotal(
 export function countContributions(
   contributions: ContributionLike[]
 ): number {
-  return contributions.length;
+  return contributions.filter((item) => item.kind !== "WITHDRAWAL").length;
 }
 
 /**

@@ -73,6 +73,7 @@ export async function getInvitationByCode(code: string) {
 export async function createCoupleWithOwner(userId: string): Promise<{
   coupleId: string;
   invitationCode: string;
+  invitationExpiresAt: Date;
 }> {
   return prisma.$transaction(async (tx) => {
     // 1. Crear la pareja con memberCount = 1 (el owner)
@@ -95,6 +96,7 @@ export async function createCoupleWithOwner(userId: string): Promise<{
     return {
       coupleId: couple.id,
       invitationCode: invitation.code,
+      invitationExpiresAt: invitation.expiresAt,
     };
   });
 }

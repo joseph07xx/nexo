@@ -7,6 +7,7 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordField } from "@/features/auth/components/password-field";
 import { loginUser, type LoginState } from "@/features/auth/actions";
 
 function SubmitButton() {
@@ -25,12 +26,13 @@ export default function LoginPage() {
   );
 
   return (
-    <Card>
+    <Card className="border-border/80 shadow-lg shadow-foreground/[0.04]">
       <CardContent className="pt-6">
-        <div className="text-center mb-6">
-          <h1 className="text-xl font-semibold tracking-tight">Bienvenido de vuelta</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Ingresa para continuar con tu ahorro compartido
+        <div className="mb-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.13em] text-primary">ACCESO A TU ESPACIO</p>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight">Qué bueno verte.</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Inicia sesión para continuar con su plan de ahorro.
           </p>
         </div>
 
@@ -41,34 +43,32 @@ export default function LoginPage() {
               id="email"
               name="email"
               type="email"
-              placeholder="tu@ejemplo.com"
+              placeholder="tu@nexo.com"
               required
               autoComplete="email"
+              maxLength={255}
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="password">Contraseña</Label>
-            <Input
+          <PasswordField
               id="password"
               name="password"
-              type="password"
-              placeholder="••••••••"
-              required
+              label="Contraseña"
+              placeholder="Tu contraseña"
               autoComplete="current-password"
+              maxLength={100}
             />
-          </div>
 
           {state?.error && (
-            <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2">
-              <p className="text-xs text-destructive">{state.error}</p>
+            <div role="alert" className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2.5">
+              <p className="text-sm text-destructive">{state.error}</p>
             </div>
           )}
 
           <SubmitButton />
         </form>
       </CardContent>
-      <CardFooter className="justify-center border-t pt-4">
+      <CardFooter className="justify-center border-t border-border pt-4">
         <p className="text-sm text-muted-foreground">
           ¿No tienes cuenta?{" "}
           <Link href="/register" className="text-primary font-medium hover:underline">

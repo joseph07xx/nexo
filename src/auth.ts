@@ -3,7 +3,13 @@ import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { loginSchema } from "@/schemas/auth";
+import { ALLOWED_EMAIL_DOMAIN, loginSchema } from "@/schemas/auth";
+import {
+  clearAuthRateLimits,
+  consumeAuthAttempts,
+  getClientIp,
+  getLoginRateLimitRules,
+} from "@/services/auth-rate-limit";
 
 export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
   adapter: PrismaAdapter(prisma),
@@ -21,11 +27,16 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Contraseña", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         const parsed = loginSchema.safeParse(credentials);
         if (!parsed.success) return null;
 
         const { email, password } = parsed.data;
+        if (!email.endsWith(ALLOWED_EMAIL_DOMAIN)) return null;
+
+        const rateLimitRules = getLoginRateLimitRules(email, getClientIp(request));
+
+        if (!(await consumeAuthAttempts(rateLimitRules))) return null;
 
         const user = await prisma.user.findUnique({
           where: { email: email.toLowerCase() },
@@ -37,6 +48,8 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         const isValid = await bcrypt.compare(password, hashToCompare);
 
         if (!user || !isValid) return null;
+
+        await clearAuthRateLimits(rateLimitRules);
 
         return {
           id: user.id,

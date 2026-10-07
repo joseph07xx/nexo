@@ -37,7 +37,7 @@ async function refreshSession(coupleId: string | null): Promise<void> {
 // CREAR PAREJA
 // ============================================
 
-export async function createCouple(): Promise<ActionResult<{ code: string }>> {
+export async function createCouple(): Promise<ActionResult<{ code: string; expiresAt: string }>> {
   const session = await auth();
   if (!session?.user?.id) {
     return { success: false, error: "No autenticado" };
@@ -53,14 +53,17 @@ export async function createCouple(): Promise<ActionResult<{ code: string }>> {
   }
 
   try {
-    const { coupleId, invitationCode } = await createCoupleWithOwner(userId);
+    const { coupleId, invitationCode, invitationExpiresAt } = await createCoupleWithOwner(userId);
 
     await refreshSession(coupleId);
 
     revalidatePath("/perfil");
     revalidatePath("/inicio");
 
-    return { success: true, data: { code: invitationCode } };
+    return {
+      success: true,
+      data: { code: invitationCode, expiresAt: invitationExpiresAt.toISOString() },
+    };
   } catch (error) {
     console.error("Error al crear pareja:", error);
     return {
@@ -177,7 +180,7 @@ export async function joinCouple(
 // ============================================
 
 export async function regenerateInvitationAction(): Promise<
-  ActionResult<{ code: string }>
+  ActionResult<{ code: string; expiresAt: string }>
 > {
   const session = await auth();
   if (!session?.user?.id) {
@@ -199,9 +202,9 @@ export async function regenerateInvitationAction(): Promise<
   }
 
   try {
-    const { code } = await regenerateInvitation(membership.coupleId, userId);
+    const { code, expiresAt } = await regenerateInvitation(membership.coupleId, userId);
     revalidatePath("/perfil");
-    return { success: true, data: { code } };
+    return { success: true, data: { code, expiresAt: expiresAt.toISOString() } };
   } catch (error) {
     console.error("Error al regenerar invitación:", error);
     return { success: false, error: "No se pudo regenerar la invitación" };

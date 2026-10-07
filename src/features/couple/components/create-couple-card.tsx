@@ -7,7 +7,7 @@ import { Users, UserPlus } from "lucide-react";
 import { createCouple } from "../actions";
 
 interface CreateCoupleCardProps {
-  onCreateSuccess: (code: string) => void;
+  onCreateSuccess: (invitation: { code: string; expiresAt: string }) => void;
   onJoinClick: () => void;
 }
 
@@ -23,7 +23,7 @@ export function CreateCoupleCard({
     startTransition(async () => {
       const result = await createCouple();
       if (result.success) {
-        onCreateSuccess(result.data.code);
+        onCreateSuccess(result.data);
       } else {
         setError(result.error);
       }
